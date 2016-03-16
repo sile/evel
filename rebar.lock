@@ -1,0 +1,4 @@
+[{<<"hash_ring">>,
+  {git,"https://github.com/sile/hash_ring.git",
+       {ref,"8c4467ec3177be9391fe39a46be2d2ffa8dc0d5d"}},
+  0}].
