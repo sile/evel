@@ -1,4 +1,4 @@
 [{<<"hash_ring">>,
   {git,"https://github.com/sile/hash_ring.git",
-       {ref,"8c4467ec3177be9391fe39a46be2d2ffa8dc0d5d"}},
+       {ref,"f90c35baeb7da589ed7386b890ab6c3492e51eb1"}},
   0}].

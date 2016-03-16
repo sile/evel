@@ -31,9 +31,9 @@ start_link() ->
 init([]) ->
     Children =
         [
-         #{id => people, start => {evel_people, start_link, []}},
          #{id => voter, start => {evel_voter, start_link, []}},
          #{id => commission, start => {evel_commission, start_link, []}},
-         #{id => token_sup, start => {evel_token_sup, start_link, []}}
+         #{id => people, start => {evel_people, start_link, []}},
+         #{id => token_sup, start => {evel_token_sup, start_link, []}} % This depends on the evel_people process
         ],
-    {ok, { #{}, Children} }.
+    {ok, { #{strategy => rest_for_one}, Children} }.

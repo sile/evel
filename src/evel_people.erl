@@ -28,7 +28,8 @@ init([]) ->
     People =
         hash_ring:make(
           lists:map(fun hash_ring_node:make/1, nodes([this, visible])),
-          [{virtual_node_count, 64}]),
+          [{module, hash_ring_dynamic},
+           {virtual_node_count, 64}]),
     State =
         #?STATE{
             people = People
