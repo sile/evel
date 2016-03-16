@@ -3,6 +3,7 @@
 
 %% NOTE: agent = 選挙事務所、的な用語でも良いのかも (agent同士がvoterを取り合う)
 %%       -> その類推で、people => voter, voter => supporter, でも良いかも
+%% TODO: この辺りの用語整理を最後にする
 -hebaviour(gen_server).
 
 -export([start_link/1]).
@@ -23,13 +24,10 @@
           election_id :: evel:election_id(),
           candidate :: evel:candidate(),
           vote :: evel_voter:vote(),
-          monitors = #{} :: #{reference() => evel_voter:voter()}
+          monitors = #{} :: #{reference() => evel_voter:voter()},
+          voters = ordsets:new() :: ordsets:ordset(evel_voter:voter())
         }).
 
-%% TODO: ノードの追加・削除が一度に大幅に行われて、構成が大きく変わった場合にも対応する(これが一番手間)
-%%       => tokenが定期的(or ノードの追加・削除のタイミング)にselect_voters/1を叩いて変化を確認するのが確実？
-%%  => evel_people側でノード追加・削除に、それによって影響を受けるtokenに通知を送るようにしたい
-%%   => コンシステントハッシュの実装に手を入れればそこまで難しい話ではない (各仮想ノードが自分が担当しているアイテム一覧を保持していれば良い)
 -spec start_link(start_arg()) -> {ok, pid()} | {error, Reason::term()}.
 start_link(Arg) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Arg, []).
@@ -69,6 +67,8 @@ handle_info({'DOWN', _, _, Pid, Reason}, State = #?STATE{candidate = Pid}) ->
     {stop, {shutdown, {candidate_exited, Pid, Reason}}, State};
 handle_info({'DOWN', Ref, _, _, _}, State) ->
     handle_voter_down(Ref, State);
+handle_info('PEOPLE_CHANGE', State) ->
+    handle_people_change(State);
 handle_info({check_voter_up, Arg}, State) ->
     handle_check_voter_up(Arg, State);
 
@@ -86,14 +86,16 @@ code_change(_OlsVsn, State, _Extra) ->
 -spec handle_campaign(#?STATE{}) -> {reply, ok, #?STATE{}}.
 handle_campaign(State) ->
     %% TODO: 重複呼び出しは禁止する
+    %% TODO: 以下の二つの処理はまとめる
     Voters = evel_people:select_voters(State#?STATE.election_id),
+    ok = evel_people:monitor_people(),
     Monitors =
         maps:from_list(
           [begin
                ok = evel_voter:recommend(Voter, State#?STATE.election_id, State#?STATE.vote),
                {monitor(process, {evel_voter, Voter}), Voter}
            end || Voter <- Voters]),
-    {reply, ok, State#?STATE{monitors = Monitors}}.
+    {reply, ok, State#?STATE{monitors = Monitors, voters = ordsets:from_list(Voters)}}.
 
 -spec handle_voter_down(reference(), #?STATE{}) -> {noreply, #?STATE{}} | {stop, Reason::term(), #?STATE{}}.
 handle_voter_down(Ref, State) ->
@@ -114,7 +116,44 @@ schedule_check_voter_up(Voter) ->
 
 -spec handle_check_voter_up(evel_voter:voter(), #?STATE{}) -> {noreply, #?STATE{}}.
 handle_check_voter_up(Voter, State) ->
-    Monitor = monitor(process, {evel_voter, Voter}),
-    ok = evel_voter:recommend(Voter, State#?STATE.election_id, State#?STATE.vote),
-    Monitors = maps:put(Monitor, Voter, State#?STATE.monitors),
-    {noreply, State#?STATE{monitors = Monitors}}.
+    case ordsets:is_element(Voter, State#?STATE.voters) of
+        false -> {noreply, State};
+        true  ->
+            Monitor = monitor(process, {evel_voter, Voter}),
+            ok = evel_voter:recommend(Voter, State#?STATE.election_id, State#?STATE.vote),
+            Monitors = maps:put(Monitor, Voter, State#?STATE.monitors),
+            {noreply, State#?STATE{monitors = Monitors}}
+    end.
+
+-spec handle_people_change(#?STATE{}) -> {noreply, #?STATE{}}.
+handle_people_change(State) ->
+    Voters = ordsets:from_list(evel_people:select_voters(State#?STATE.election_id)),
+    io:format("[DEBUG] id=~w:~w => ~w\n", [State#?STATE.election_id, State#?STATE.voters, Voters]),
+    case Voters =:= State#?STATE.voters of
+        true  -> {noreply, State};
+        false ->
+            %% TODO: campaign時と共通化
+            Added = ordsets:subtract(Voters, State#?STATE.voters),
+            Deleted = ordsets:subtract(State#?STATE.voters, Voters),
+            io:format("[DEBUG] id=~w, added=~w, deleted=~w\n", [State#?STATE.election_id, Added, Deleted]),
+            Monitors0 =
+                ordsets:fold(
+                  fun (Voter, Acc) ->
+                          ok = evel_voter:recommend(Voter, State#?STATE.election_id, State#?STATE.vote),
+                          maps:put(monitor(process, {evel_voter, Voter}), Voter, Acc)
+                  end,
+                  State#?STATE.monitors,
+                  Added),
+            Monitors1 =
+                maps:filter(
+                  fun (Ref, V) ->
+                          case ordsets:is_element(V, Deleted) of
+                              false -> true;
+                              true  ->
+                                  _ = demonitor(Ref, [flush]),
+                                  false
+                          end
+                  end,
+                  Monitors0),
+            {noreply, State#?STATE{monitors = Monitors1, voters = ordsets:from_list(Voters)}}
+    end.
