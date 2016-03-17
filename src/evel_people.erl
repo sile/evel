@@ -1,41 +1,69 @@
+%% Copyright (c) 2016 Takeru Ohta <phjgt308@gmail.com>
+%%
+%% This software is released under the MIT License.
+%% See the LICENSE file in the project root for full license information.
+%%
+%% @doc This process manages the list of potential voters
+%%
 %% @private
+%% @end
 -module(evel_people).
 
 -hebaviour(gen_server).
 
+%%----------------------------------------------------------------------------------------------------------------------
+%% Exported API
+%%----------------------------------------------------------------------------------------------------------------------
 -export([start_link/0]).
--export([select_voters/1]).
--export([monitor_people/0]).
+-export([inquire_voters/2]).
 
+-export_type([notification/0]).
+
+%%----------------------------------------------------------------------------------------------------------------------
+%% 'gen_server' Callback API
+%%----------------------------------------------------------------------------------------------------------------------
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+
+%%----------------------------------------------------------------------------------------------------------------------
+%% Macros & Records & Types
+%%----------------------------------------------------------------------------------------------------------------------
+%% FIXME: To be specified from the outside
+-define(HASH_RING_OPTIONS, [{module, hash_ring_dynamic}, {virtual_node_count, 64}]).
+-define(PER_ELECTION_VOTER_COUNT, 5).
 
 -define(STATE, ?MODULE).
 -record(?STATE,
         {
-          people :: hash_ring:ring(),
-          agents = [] :: [pid()]
+          people         :: hash_ring:ring(evel_voter:voter()),
+          listeners = [] :: [pid()]
         }).
 
+-type notification() :: {'PERSON_JOIN', PotentialVoter::evel_voter:voter()}
+                      | {'PERSON_LEAVE', PotentialVoter::evel_voter:voter()}.
+
+%%----------------------------------------------------------------------------------------------------------------------
+%% Exported Functions
+%%----------------------------------------------------------------------------------------------------------------------
+%% @doc Starts a process
 -spec start_link() -> {ok, pid()} | {error, Reason::term()}.
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
--spec select_voters(evel:election_id()) -> [evel_voter:voter()].
-select_voters(ElectionId) ->
-    gen_server:call(?MODULE, {select_voters, ElectionId}).
+%% @doc Inquires voters who are concerned with the election
+%%
+%% If `DoMonitor' is `true', the caller will receive `notification()' messages when the population has changed.
+-spec inquire_voters(evel:election_id(), boolean()) -> [evel_voter:voter()].
+inquire_voters(ElectionId, DoMonitor) ->
+    gen_server:call(?MODULE, {inquire_voters, {ElectionId, self(), DoMonitor}}).
 
--spec monitor_people() -> ok.
-monitor_people() ->
-    gen_server:cast(?MODULE, {monitor_people, self()}).
-
+%%----------------------------------------------------------------------------------------------------------------------
+%% 'gen_server' Callback Functions
+%%----------------------------------------------------------------------------------------------------------------------
 %% @private
 init([]) ->
-    ok = net_kernel:monitor_nodes(true), % TODO: どの程度信頼できるか(i.e., 自前pollingが不要かどうか)は要確認
-    People =
-        hash_ring:make(
-          lists:map(fun hash_ring_node:make/1, nodes([this, visible])),
-          [{module, hash_ring_dynamic},
-           {virtual_node_count, 64}]),
+    ok = net_kernel:monitor_nodes(true),
+    Voters = nodes([this, visible]),
+    People = hash_ring:make(lists:map(fun hash_ring_node:make/1, Voters), ?HASH_RING_OPTIONS),
     State =
         #?STATE{
             people = People
@@ -43,28 +71,20 @@ init([]) ->
     {ok, State}.
 
 %% @private
-handle_call({select_voters, Arg}, _From, State) ->
-    handle_select_voters(Arg, State);
+handle_call({inquire_voters, Arg}, _From, State) ->
+    handle_inquire_voters(Arg, State);
 handle_call(Request, From, State) ->
     {stop, {unknown_call, Request, From}, State}.
 
 %% @private
-handle_cast({monitor_people, Arg}, State) ->
-    handle_monitor_people(Arg, State);
 handle_cast(Request, State) ->
     {stop, {unknown_cast, Request}, State}.
 
 %% @private
 handle_info({nodeup, Node}, State) ->
-    io:format("[DEBUG] nodeup: ~p\n", [Node]),
-    People = hash_ring:add_node(hash_ring_node:make(Node), State#?STATE.people),
-    ok = notify_change(State),
-    {noreply, State#?STATE{people = People}};
+    handle_nodeup(Node, State);
 handle_info({nodedown, Node}, State) ->
-    io:format("[DEBUG] nodedown: ~p\n", [Node]),
-    People = hash_ring:remove_node(Node, State#?STATE.people),
-    ok = notify_change(State),
-    {noreply, State#?STATE{people = People}};
+    handle_nodedown(Node, State);
 handle_info({'DOWN', _, _, Pid, _}, State) ->
     handle_down(Pid, State);
 handle_info(Info, State) ->
@@ -78,28 +98,45 @@ terminate(_Reason, _State) ->
 code_change(_OlsVsn, State, _Extra) ->
     {ok, State}.
 
--spec handle_select_voters(evel:election_id(), #?STATE{}) -> {reply, [evel_voter:voter()], #?STATE{}}.
-handle_select_voters(ElectionId, State) ->
-    Count = 5, % TODO
+%%----------------------------------------------------------------------------------------------------------------------
+%% Internal Functions
+%%----------------------------------------------------------------------------------------------------------------------
+-spec handle_inquire_voters({evel:election_id(), pid(), boolean()}, #?STATE{}) ->
+                                   {reply, [evel_voter:voter()], #?STATE{}}.
+handle_inquire_voters({ElectionId, From, DoMonitor}, State) ->
+    Count = ?PER_ELECTION_VOTER_COUNT,
     Voters =
         lists:map(
           fun hash_ring_node:get_key/1,
           hash_ring:collect_nodes(ElectionId, Count, State#?STATE.people)),
-    {reply, Voters, State}.
-
--spec handle_monitor_people(pid(), #?STATE{}) -> {noreply, #?STATE{}}.
-handle_monitor_people(Agent, State) ->
-    _ = monitor(process, Agent),
-    {noreply, State#?STATE{agents = [Agent | State#?STATE.agents]}}.
+    Listeners =
+        case DoMonitor of
+            false -> State#?STATE.listeners;
+            true  ->
+                _ = monitor(process, From),
+                [From | State#?STATE.listeners]
+        end,
+    {reply, Voters, State#?STATE{listeners = Listeners}}.
 
 -spec handle_down(pid(), #?STATE{}) -> {noreply, #?STATE{}}.
-handle_down(Agent, State) ->
-    {noreply, State#?STATE{agents = lists:delete(Agent, State#?STATE.agents)}}.
+handle_down(Listener, State) ->
+    Listeners = lists:delete(Listener, State#?STATE.listeners),
+    {noreply, State#?STATE{listeners = Listeners}}.
 
--spec notify_change(#?STATE{}) -> ok.
-notify_change(State) ->
+-spec handle_nodeup(node(), #?STATE{}) -> {noreply, #?STATE{}}.
+handle_nodeup(Node, State) ->
+    People = hash_ring:add_node(hash_ring_node:make(Node), State#?STATE.people),
+    ok = notify_change({'PERSON_JOIN', Node}, State),
+    {noreply, State#?STATE{people = People}}.
+
+-spec handle_nodedown(node(), #?STATE{}) -> {noreply, #?STATE{}}.
+handle_nodedown(Node, State) ->
+    People = hash_ring:remove_node(Node, State#?STATE.people),
+    ok = notify_change({'PERSON_LEAVE', Node}, State),
+    {noreply, State#?STATE{people = People}}.
+
+-spec notify_change(notification(), #?STATE{}) -> ok.
+notify_change(Message, State) ->
     lists:foreach(
-      fun (A) ->
-              A ! 'PEOPLE_CHANGE'
-      end,
-      State#?STATE.agents).
+      fun (Pid) -> Pid ! Message end,
+      State#?STATE.listeners).

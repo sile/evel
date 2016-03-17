@@ -12,7 +12,7 @@
   {env,[]},
   {modules, []},
 
-  {maintainers, []},
-  {licenses, []},
-  {links, []}
+  {maintainers, ["Takeru Ohta"]},
+  {licenses, ["MIT"]},
+  {links, [{"GitHub","https://github.com/sile/evel"}]}
  ]}.

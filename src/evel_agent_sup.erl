@@ -3,10 +3,10 @@
 %% This software is released under the MIT License.
 %% See the LICENSE file in the project root for full license information.
 %%
-%% @doc Root Supervisor
+%% @doc The Supervisor for even_agent processes
 %% @private
 %% @end
--module(evel_sup).
+-module(evel_agent_sup).
 
 -behaviour(supervisor).
 
@@ -14,6 +14,7 @@
 %% Exported API
 %%----------------------------------------------------------------------------------------------------------------------
 -export([start_link/0]).
+-export([start_child/1]).
 
 %%----------------------------------------------------------------------------------------------------------------------
 %% 'supervisor' Callback API
@@ -28,18 +29,15 @@
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
+%% @doc Starts a child
+-spec start_child(evel_agent:start_arg()) -> {ok, pid()} | {error, Reason::term()}.
+start_child(Arg) ->
+    supervisor:start_child(?MODULE, [Arg]).
+
 %%----------------------------------------------------------------------------------------------------------------------
 %% 'supervisor' Callback Functions
 %%----------------------------------------------------------------------------------------------------------------------
 %% @private
 init([]) ->
-    Children =
-        [
-         #{id => commission, start => {evel_commission, start_link, []}},
-         #{id => voter, start => {evel_voter, start_link, []}},
-         #{id => people, start => {evel_people, start_link, []}},
-
-         %% This depends on the `evel_people' process
-         #{id => agent_sup, start => {evel_agent_sup, start_link, []}, type => supervisor}
-        ],
-    {ok, {#{strategy => rest_for_one}, Children}}.
+    Child = #{id => token, start => {evel_agent, start_link, []}, restart => temporary},
+    {ok, {#{strategy => simple_one_for_one}, [Child]}}.

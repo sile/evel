@@ -1,15 +1,32 @@
+%% Copyright (c) 2016 Takeru Ohta <phjgt308@gmail.com>
+%%
+%% This software is released under the MIT License.
+%% See the LICENSE file in the project root for full license information.
+%%
+%% @doc This process manages elections and records leaders in which local clients are interested
+%%
 %% @private
+%% @end
 -module(evel_commission).
 
 -hebaviour(gen_server).
 
+%%----------------------------------------------------------------------------------------------------------------------
+%% Exported API
+%%----------------------------------------------------------------------------------------------------------------------
 -export([start_link/0]).
 -export([elect/2]).
 -export([dismiss/1]).
 -export([find_leader/1]).
 
+%%----------------------------------------------------------------------------------------------------------------------
+%% 'gen_server' Callback API
+%%----------------------------------------------------------------------------------------------------------------------
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
+%%----------------------------------------------------------------------------------------------------------------------
+%% Macros & Records & Types
+%%----------------------------------------------------------------------------------------------------------------------
 -define(STATE, ?MODULE).
 -record(?STATE,
         {
@@ -17,6 +34,10 @@
           cert_to_vote = #{} :: #{evel:certificate() => {evel:election_id(), evel_voter:vote()}}
         }).
 
+%%----------------------------------------------------------------------------------------------------------------------
+%% Exported Functions
+%%----------------------------------------------------------------------------------------------------------------------
+%% @doc Starts a process
 -spec start_link() -> {ok, pid()} | {error, Reason::term()}.
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -26,7 +47,7 @@ elect(ElectionId, Candidate) ->
     case find_leader(ElectionId) of
         {ok, Leader} -> Leader;
         error        ->
-            ok = evel_voter:vote(ElectionId, Candidate),
+            ok = evel_agent:start_campaign(ElectionId, Candidate),
             {ok, Leader} = find_leader(ElectionId),
             Leader
     end.
@@ -46,6 +67,9 @@ find_leader(ElectionId) ->
             Other
     end.
 
+%%----------------------------------------------------------------------------------------------------------------------
+%% 'gen_server' Callback Functions
+%%----------------------------------------------------------------------------------------------------------------------
 %% @private
 init([]) ->
     Table = ets:new(?MODULE, [named_table, protected, {read_concurrency, true}]),
@@ -79,6 +103,9 @@ terminate(_Reason, _State) ->
 code_change(_OlsVsn, State, _Extra) ->
     {ok, State}.
 
+%%----------------------------------------------------------------------------------------------------------------------
+%% Internal Functions
+%%----------------------------------------------------------------------------------------------------------------------
 -spec find_local(evel:election_id()) -> {ok, evel:leader()} | error.
 find_local(ElectionId) ->
     try ets:lookup(?MODULE, ElectionId) of
@@ -97,7 +124,7 @@ fetch_leader(ElectionId) ->
             {_, _, Certificate} = ElectedVote,
             ok = lists:foreach(
                    fun ({Voter, {_, _, Cert}}) ->
-                           Cert =:= Certificate orelse evel_voter:recommend(Voter, ElectionId, ElectedVote)
+                           Cert =:= Certificate orelse evel_voter:solicit(Voter, ElectionId, ElectedVote)
                    end,
                    Others),
             gen_server:call(?MODULE, {record_leader, {ElectionId, ElectedVote}})
