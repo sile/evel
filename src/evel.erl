@@ -52,7 +52,7 @@ find_leader(ElectionId) ->
 
 -spec known_leaders() -> [{election_id(), leader()}].
 known_leaders() ->
-    error(unimplemented, []).
+    evel_commission:known_leaders().
 
 -spec get_winner(leader()) -> winner().
 get_winner(Leader) ->

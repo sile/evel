@@ -31,7 +31,9 @@
 %%----------------------------------------------------------------------------------------------------------------------
 %% Macros & Records & Types
 %%----------------------------------------------------------------------------------------------------------------------
--define(CHECK_VOTER_UP_INTERVAL, 5000).
+%% FIXME: To be specified from the outside
+-define(CHECK_VOTER_UP_INTERVAL, 1000).
+-define(DECIDE_PRIORITY, erlang:system_time(micro_seconds)). % rand:uniform()).
 
 -define(STATE, ?MODULE).
 -record(?STATE,
@@ -70,7 +72,7 @@ init({ElectionId, Candidate}) ->
         #?STATE{
             election_id = ElectionId,
             candidate   = Candidate,
-            vote        = {rand:uniform(), Candidate, self()}
+            vote        = {?DECIDE_PRIORITY, Candidate, self()}
            },
     State1 = do_campaign(State0),
     {ok, State1}.

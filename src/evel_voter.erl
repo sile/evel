@@ -15,9 +15,11 @@
 %% Exported API
 %%----------------------------------------------------------------------------------------------------------------------
 -export([start_link/0]).
--export([global_name/1]).
 -export([solicit/3]).
--export([request_vote/3]).
+-export([vote/1]).
+-export([global_name/1]).
+-export([vote_to_leader/1]).
+-export([get_agent/1]).
 
 -export_type([voter/0]).
 -export_type([vote/0]).
@@ -39,8 +41,8 @@
         }).
 
 -type voter() :: node().
--type vote() :: {priority(), evel:candidate(), evel:agent()}.
--type priority() :: float().
+-type vote() :: {priority(), evel:candidate(), evel_agent:agent()}.
+-type priority() :: term().
 
 %%----------------------------------------------------------------------------------------------------------------------
 %% Exported Functions
@@ -50,23 +52,32 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-%% @doc Returns the globally accessible name of `Voter'
--spec global_name(voter()) -> {?MODULE, voter()}.
-global_name(Voter) ->
-    {?MODULE, Voter}.
-
 %% @doc Solicits `Vote' from `Voter'
 -spec solicit(voter(), evel:election_id(), vote()) -> ok.
 solicit(Voter, ElectionId, Vote) ->
     gen_server:cast(global_name(Voter), {solicit, {ElectionId, Vote}}).
 
-%% @doc Requests a vote on the election
+%% @doc Votes in the election
 %%
-%% If `Voter' votes, the caller will receive `{Tag, vote()}' message.
-%% Otherwise no messages will be delivered.
--spec request_vote(voter(), evel:election_id(), reference()) -> ok.
-request_vote(Voter, ElectionId, Tag) ->
-    gen_server:cast({?MODULE, Voter}, {request_vote, {self(), ElectionId, Tag}}).
+%% If the voter does not support anyone, it will return `no_vote'.
+-spec vote(evel:election_id()) -> vote() | no_vote.
+vote(ElectionId) ->
+    gen_server:call(?MODULE, {vote, ElectionId}).
+
+%% @doc Returns the globally accessible name of `Voter'
+-spec global_name(voter()) -> {?MODULE, voter()}.
+global_name(Voter) ->
+    {?MODULE, Voter}.
+
+%% @doc Converts `vote()' to `evel:leader()'
+-spec vote_to_leader(vote()) -> evel:leader().
+vote_to_leader({_, Candidate, Agent}) ->
+    {Candidate, Agent}.
+
+%% @doc Gets the agent of `Vote'
+-spec get_agent(Vote :: vote()) -> evel_agent:agent().
+get_agent({_, _, Agent}) ->
+    Agent.
 
 %%----------------------------------------------------------------------------------------------------------------------
 %% 'gen_server' Callback Functions
@@ -77,14 +88,14 @@ init([]) ->
     {ok, State}.
 
 %% @private
+handle_call({vote, Arg}, _From, State) ->
+    handle_vote(Arg, State);
 handle_call(Request, From, State) ->
     {stop, {unknown_call, Request, From}, State}.
 
 %% @private
 handle_cast({solicit, Arg}, State) ->
     handle_solicit(Arg, State);
-handle_cast({request_vote, Arg}, State) ->
-    handle_request_vote(Arg, State);
 handle_cast(Request, State) ->
     {stop, {unknown_cast, Request}, State}.
 
@@ -117,10 +128,10 @@ handle_solicit({ElectionId, SolicitedVote}, State) ->
         {ok, SolicitedVote} ->
             {noreply, State};
         {ok, CurrentVote} when CurrentVote < SolicitedVote ->
-            ok = reject(SolicitedVote),
+            ok = evel:dismiss(vote_to_leader(SolicitedVote)),
             {noreply, State};
         {ok, CurrentVote} ->
-            ok = reject(CurrentVote),
+            ok = evel:dismiss(vote_to_leader(CurrentVote)),
             handle_solicit({ElectionId, SolicitedVote}, remove_vote(get_agent(CurrentVote), State))
     end.
 
@@ -129,13 +140,12 @@ handle_down(Agent, State0) ->
     State1 = remove_vote(Agent, State0),
     {noreply, State1}.
 
--spec handle_request_vote({pid(), evel:election_id(), reference()}, #?STATE{}) -> {noreply, #?STATE{}}.
-handle_request_vote({Venue, ElectionId, Tag}, State) ->
-    ok = case maps:find(ElectionId, State#?STATE.votes) of
-             error      -> ok;
-             {ok, Vote} -> vote(Venue, Tag, Vote)
-         end,
-    {noreply, State}.
+-spec handle_vote(evel:election_id(), #?STATE{}) -> {reply, vote() | no_vote, #?STATE{}}.
+handle_vote(ElectionId, State) ->
+    case maps:find(ElectionId, State#?STATE.votes) of
+        error      -> {reply, no_vote, State};
+        {ok, Vote} -> {reply, Vote, State}
+    end.
 
 -spec remove_vote(evel_agent:agent(), #?STATE{}) -> #?STATE{}.
 remove_vote(Agent, State) ->
@@ -146,16 +156,3 @@ remove_vote(Agent, State) ->
             Agents = maps:remove(Agent, State#?STATE.agents),
             State#?STATE{votes = Votes, agents = Agents}
     end.
-
--spec reject(vote()) -> ok.
-reject({_, Candidate, Agent}) ->
-    evel:dismiss({Candidate, Agent}).
-
--spec get_agent(vote()) -> evel_agent:agent().
-get_agent({_, _, Agent}) ->
-    Agent.
-
--spec vote(pid(), reference(), vote()) -> ok.
-vote(Venue, Tag, Vote) ->
-    _ = Venue ! {Tag, Vote},
-    ok.
