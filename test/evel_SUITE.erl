@@ -15,6 +15,7 @@
 -export([parallel_elect_test/1]).
 -export([nodes_join_test/1]).
 -export([nodes_leave_test/1]).
+-export([non_evel_nodes_test/1]).
 -export([summary_test/1]).
 
 -define(INITIAL_NODES, 6).
@@ -28,6 +29,7 @@ all() ->
      parallel_elect_test,
      nodes_join_test,
      nodes_leave_test,
+     non_evel_nodes_test,
      summary_test
     ].
 
@@ -103,6 +105,27 @@ nodes_leave_test(_Config) ->
     {Results1, []} = rpc:multicall(evel, find_leader, [foo]),
     ok = lists:foreach(fun (Result) -> {ok, Leader} = Result end, Results1).
 
+non_evel_nodes_test(_Config) ->
+    ok = bare_slart_start_link(?INITIAL_NODES + 1, ?INITIAL_NODES + 5),
+    ?SLAVE_WAIT,
+    ?INITIAL_NODES = length(nodes()) - 5,
+    Self = self(),
+    {Self, _} = Leader = evel:elect(foo, Self),
+
+    {Results, []} = rpc:multicall(evel, find_leader, [foo]),
+    ?INITIAL_NODES = length([R || R <- Results, {ok, Leader} =:= R]) - 1.
+
 summary_test(_Config) ->
     _ = evel:elect(foo, self()),
     #{knowns := _, votes := _, people := _, agents := _} = evel_debug:summary().
+
+%%----------------------------------------------------------------------------------------------------------------------
+%% Internal Functions
+%%----------------------------------------------------------------------------------------------------------------------
+bare_slart_start_link(Start, End) ->
+    {ok, Host} = inet:gethostname(),
+    lists:foreach(
+      fun (I) ->
+              {ok, _} = slave:start_link(Host, integer_to_list(I))
+      end,
+      lists:seq(Start, End)).
