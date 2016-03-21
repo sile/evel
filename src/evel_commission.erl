@@ -178,7 +178,7 @@ handle_down(Agent, State) ->
 -spec remove_leader(evel_agent:agent(), #?STATE{}) -> #?STATE{}.
 remove_leader(Agent, State) ->
     case maps:find(Agent, State#?STATE.agents) of
-        error                 -> State;
+        error                 -> State; % `Agent' was already removed in `handle_record_leader/2'
         {ok, {ElectionId, _}} ->
             Agents = maps:remove(Agent, State#?STATE.agents),
             _ = ets:delete(State#?STATE.elections, ElectionId),

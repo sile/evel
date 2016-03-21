@@ -29,7 +29,8 @@ elect_test_() ->
                ?assertEqual(error, evel:find_leader(foo)),
 
                Leader = evel:elect(foo, self()),
-               ?assertEqual({ok, Leader}, evel:find_leader(foo))
+               ?assertEqual({ok, Leader}, evel:find_leader(foo)),
+               ?assertEqual(self(), evel:get_winner(Leader))
        end},
       {"Dismiss the leader",
        fun () ->
@@ -41,3 +42,7 @@ elect_test_() ->
                ?assertEqual(error, evel:find_leader(foo))
        end}
      ]}.
+
+is_leader_test() ->
+    ?assert(evel:is_leader({self(), self()})),
+    ?assertNot(evel:is_leader(self())).

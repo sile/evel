@@ -1,4 +1,6 @@
-all: compile xref eunit dialyze edoc
+.PHONY: test
+
+all: compile xref test dialyze edoc
 
 compile:
 	@./rebar3 compile
@@ -9,8 +11,10 @@ xref:
 clean:
 	@./rebar3 clean
 
-eunit:
-	@./rebar3 do eunit,cover
+test:
+	@./rebar3 eunit
+	@./rebar3 ct
+	@./rebar3 cover
 
 edoc:
 	@./rebar3 as edown edoc
