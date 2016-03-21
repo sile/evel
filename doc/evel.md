@@ -35,11 +35,21 @@ certificate() = pid()
 
 
 
+### <a name="type-dismiss_option">dismiss_option()</a> ###
+
+
+<pre><code>
+dismiss_option() = {unlink, boolean()}
+</code></pre>
+
+
+
+
 ### <a name="type-elect_option">elect_option()</a> ###
 
 
 <pre><code>
-elect_option() = {priority, term()} | <a href="#type-find_option">find_option()</a>
+elect_option() = {priority, term()} | {link, boolean()} | <a href="#type-find_option">find_option()</a>
 </code></pre>
 
 
@@ -87,7 +97,7 @@ winner() = <a href="#type-candidate">candidate()</a>
 ## Function Index ##
 
 
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#dismiss-1">dismiss/1</a></td><td></td></tr><tr><td valign="top"><a href="#elect-2">elect/2</a></td><td>Equivalent to <a href="#elect-3"><tt>elect(ElectionId, Candidate, [])</tt></a>.</td></tr><tr><td valign="top"><a href="#elect-3">elect/3</a></td><td></td></tr><tr><td valign="top"><a href="#find_leader-1">find_leader/1</a></td><td>Equivalent to <a href="#find_leader-2"><tt>find_leader(ElectionId, [])</tt></a>.</td></tr><tr><td valign="top"><a href="#find_leader-2">find_leader/2</a></td><td></td></tr><tr><td valign="top"><a href="#get_certificate-1">get_certificate/1</a></td><td></td></tr><tr><td valign="top"><a href="#get_winner-1">get_winner/1</a></td><td></td></tr><tr><td valign="top"><a href="#is_leader-1">is_leader/1</a></td><td></td></tr><tr><td valign="top"><a href="#known_leaders-0">known_leaders/0</a></td><td></td></tr></table>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#dismiss-1">dismiss/1</a></td><td>Equivalent to <a href="#dismiss-2"><tt>dismiss(Leader, [])</tt></a>.</td></tr><tr><td valign="top"><a href="#dismiss-2">dismiss/2</a></td><td></td></tr><tr><td valign="top"><a href="#elect-2">elect/2</a></td><td>Equivalent to <a href="#elect-3"><tt>elect(ElectionId, Candidate, [])</tt></a>.</td></tr><tr><td valign="top"><a href="#elect-3">elect/3</a></td><td></td></tr><tr><td valign="top"><a href="#find_leader-1">find_leader/1</a></td><td>Equivalent to <a href="#find_leader-2"><tt>find_leader(ElectionId, [])</tt></a>.</td></tr><tr><td valign="top"><a href="#find_leader-2">find_leader/2</a></td><td></td></tr><tr><td valign="top"><a href="#get_certificate-1">get_certificate/1</a></td><td></td></tr><tr><td valign="top"><a href="#get_winner-1">get_winner/1</a></td><td></td></tr><tr><td valign="top"><a href="#is_leader-1">is_leader/1</a></td><td></td></tr><tr><td valign="top"><a href="#known_leaders-0">known_leaders/0</a></td><td></td></tr></table>
 
 
 <a name="functions"></a>
@@ -100,6 +110,17 @@ winner() = <a href="#type-candidate">candidate()</a>
 
 <pre><code>
 dismiss(Leader::<a href="#type-leader">leader()</a>) -&gt; ok
+</code></pre>
+<br />
+
+Equivalent to [`dismiss(Leader, [])`](#dismiss-2).
+
+<a name="dismiss-2"></a>
+
+### dismiss/2 ###
+
+<pre><code>
+dismiss(Leader::<a href="#type-leader">leader()</a>, Options::[<a href="#type-dismiss_option">dismiss_option()</a>]) -&gt; ok
 </code></pre>
 <br />
 

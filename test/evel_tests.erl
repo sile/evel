@@ -30,7 +30,7 @@ elect_test_() ->
        end},
       {"Dismiss the leader",
        fun () ->
-               Leader = evel:elect(foo, self()),
+               Leader = evel:elect(foo, self(), [{link, false}]),
                {ok, _} = evel:find_leader(foo),
 
                ?assertEqual(ok, evel:dismiss(Leader)),

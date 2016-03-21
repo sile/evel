@@ -11,7 +11,7 @@
 %% Exported API
 %%----------------------------------------------------------------------------------------------------------------------
 -export([elect/2, elect/3]).
--export([dismiss/1]).
+-export([dismiss/1, dismiss/2]).
 -export([find_leader/1, find_leader/2]).
 -export([known_leaders/0]).
 -export([is_leader/1]).
@@ -25,6 +25,7 @@
 -export_type([certificate/0]).
 -export_type([elect_option/0]).
 -export_type([find_option/0]).
+-export_type([dismiss_option/0]).
 
 %%----------------------------------------------------------------------------------------------------------------------
 %% Types
@@ -36,10 +37,13 @@
 -type leader()      :: {winner(), certificate()}.
 
 -type elect_option() :: {priority, term()}
+                      | {link, boolean()}
                       | find_option().
 
 -type find_option() :: {timeout, timeout()}
                      | {voter_count, pos_integer()}.
+
+-type dismiss_option() :: {unlink, boolean()}.
 
 %%----------------------------------------------------------------------------------------------------------------------
 %% Exported Functions
@@ -55,9 +59,19 @@ elect(ElectionId, Candidate, Options) ->
     _ = is_list(Options) orelse error(badarg, [ElectionId, Candidate, Options]),
     evel_commission:elect(ElectionId, Candidate, Options).
 
+%% @equiv dismiss(Leader, [])
 -spec dismiss(leader()) -> ok.
 dismiss(Leader) ->
-    _ = is_leader(Leader) orelse error(badarg, [Leader]),
+    dismiss(Leader, []).
+
+-spec dismiss(leader(), [dismiss_option()]) -> ok.
+dismiss(Leader, Options) ->
+    _ = is_leader(Leader) orelse error(badarg, [Leader, Options]),
+    _ = is_list(Options) orelse error(badarg, [Leader, Options]),
+    _ = case proplists:get_value(unlink, Options, false) of
+            false -> ok;
+            true  -> catch evel_agent:unlink_candidate(get_certificate(Leader))
+        end,
     evel_commission:dismiss(Leader).
 
 %% @equiv find_leader(ElectionId, [])

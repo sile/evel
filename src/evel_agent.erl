@@ -19,6 +19,7 @@
 %%----------------------------------------------------------------------------------------------------------------------
 -export([start_link/1]).
 -export([start_campaign/3]).
+-export([unlink_candidate/1]).
 
 -export_type([start_arg/0]).
 -export_type([agent/0]).
@@ -59,6 +60,11 @@ start_campaign(ElectionId, Candidate, Options) ->
     {ok, _} = evel_agent_sup:start_child({ElectionId, Candidate, Options}),
     ok.
 
+%% @doc Removes the link between `Agent' and the corresponding candidate process
+-spec unlink_candidate(agent()) -> ok.
+unlink_candidate(Agent) ->
+    gen_server:call(Agent, unlink_candidate).
+
 %%----------------------------------------------------------------------------------------------------------------------
 %% 'gen_server' Callback Functions
 %%----------------------------------------------------------------------------------------------------------------------
@@ -66,7 +72,10 @@ start_campaign(ElectionId, Candidate, Options) ->
 init({ElectionId, Candidate, Options}) ->
     Priority = proplists:get_value(priority, Options, erlang:system_time(micro_seconds)),
     VoterCount = proplists:get_value(voter_count, Options, 5),
-
+    _ = case proplists:get_value(link, Options, true) of
+            true  -> link(Candidate);
+            false -> true
+        end,
     _ = monitor(process, Candidate),
     State0 =
         #?STATE{
@@ -79,6 +88,9 @@ init({ElectionId, Candidate, Options}) ->
     {ok, State1}.
 
 %% @private
+handle_call(unlink_candidate, _From, State) ->
+    _ = unlink(State#?STATE.candidate),
+    {reply, ok, State};
 handle_call(Request, From, State) ->
     {stop, {unknown_call, Request, From}, State}.
 
