@@ -19,6 +19,7 @@
 -export([collect_votes/3]).
 -export([vote_to_leader/1]).
 -export([get_agent/1]).
+-export([get_votes/0]).
 -export([self_voter/0]).
 
 -export_type([voter/0]).
@@ -99,6 +100,11 @@ vote_to_leader({_, Candidate, Agent}) ->
 get_agent({_, _, Agent}) ->
     Agent.
 
+%% @doc Gets the current votes
+-spec get_votes() -> [{evel:election_id(), vote()}].
+get_votes() ->
+    gen_server:call(?MODULE, get_votes).
+
 %% @doc Gets the voter on the current node
 -spec self_voter() -> voter().
 self_voter() ->
@@ -115,6 +121,8 @@ init([]) ->
     {ok, State}.
 
 %% @private
+handle_call(get_votes, _From, State) ->
+    {reply, maps:to_list(State#?STATE.votes), State};
 handle_call(Request, From, State) ->
     {stop, {unknown_call, Request, From}, State}.
 

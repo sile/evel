@@ -18,6 +18,7 @@
 -export([join/2]).
 -export([join_ack/2]).
 -export([inquire_voters/3]).
+-export([get_people/0]).
 
 -export_type([notification/0]).
 
@@ -54,6 +55,11 @@ start_link() ->
 inquire_voters(ElectionId, VoterCount, DoMonitor) ->
     gen_server:call(?MODULE, {inquire_voters, {ElectionId, self(), VoterCount, DoMonitor}}).
 
+%% @doc Gets the known people list
+-spec get_people() -> [evel_voter:voter()].
+get_people() ->
+    gen_server:call(?MODULE, get_people).
+
 %%----------------------------------------------------------------------------------------------------------------------
 %% 'gen_server' Callback Functions
 %%----------------------------------------------------------------------------------------------------------------------
@@ -74,6 +80,9 @@ init([]) ->
 %% @private
 handle_call({inquire_voters, Arg}, _From, State) ->
     handle_inquire_voters(Arg, State);
+handle_call(get_people, _From, State) ->
+    People = lists:map(fun hash_ring_node:get_key/1, hash_ring:get_node_list(State#?STATE.people)),
+    {reply, People, State};
 handle_call(Request, From, State) ->
     {stop, {unknown_call, Request, From}, State}.
 

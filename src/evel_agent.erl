@@ -20,6 +20,7 @@
 -export([start_link/1]).
 -export([start_campaign/3]).
 -export([unlink_candidate/1]).
+-export([get_summary/1]).
 
 -export_type([start_arg/0]).
 -export_type([agent/0]).
@@ -65,6 +66,11 @@ start_campaign(ElectionId, Candidate, Options) ->
 unlink_candidate(Agent) ->
     gen_server:call(Agent, unlink_candidate).
 
+%% @doc Gets the summary of `Agent'
+-spec get_summary(agent()) -> {evel:election_id(), evel_voter:vote(), [evel_voter:voter()]}.
+get_summary(Agent) ->
+    gen_server:call(Agent, get_summary).
+
 %%----------------------------------------------------------------------------------------------------------------------
 %% 'gen_server' Callback Functions
 %%----------------------------------------------------------------------------------------------------------------------
@@ -91,6 +97,9 @@ init({ElectionId, Candidate, Options}) ->
 handle_call(unlink_candidate, _From, State) ->
     _ = unlink(State#?STATE.candidate),
     {reply, ok, State};
+handle_call(get_summary, _From, State) ->
+    Summary = {State#?STATE.election_id, State#?STATE.vote, ordsets:to_list(State#?STATE.voters)},
+    {reply, Summary, State};
 handle_call(Request, From, State) ->
     {stop, {unknown_call, Request, From}, State}.
 
