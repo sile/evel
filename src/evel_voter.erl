@@ -16,10 +16,10 @@
 %%----------------------------------------------------------------------------------------------------------------------
 -export([start_link/0]).
 -export([solicit/3]).
--export([vote/1]).
--export([global_name/1]).
+-export([collect_votes/3]).
 -export([vote_to_leader/1]).
 -export([get_agent/1]).
+-export([self_voter/0]).
 
 -export_type([voter/0]).
 -export_type([vote/0]).
@@ -40,7 +40,7 @@
           agents = #{} :: #{evel_agent:agent() => evel:election_id()}
         }).
 
--type voter() :: node().
+-type voter() :: pid().
 -type vote() :: {priority(), evel:candidate(), evel_agent:agent()}.
 -type priority() :: term().
 
@@ -55,19 +55,39 @@ start_link() ->
 %% @doc Solicits `Vote' from `Voter'
 -spec solicit(voter(), evel:election_id(), vote()) -> ok.
 solicit(Voter, ElectionId, Vote) ->
-    gen_server:cast(global_name(Voter), {solicit, {ElectionId, Vote}}).
+    gen_server:cast(Voter, {solicit, {ElectionId, Vote}}).
 
-%% @doc Votes in the election
-%%
-%% If the voter does not support anyone, it will return `no_vote'.
--spec vote(evel:election_id()) -> vote() | no_vote.
-vote(ElectionId) ->
-    gen_server:call(?MODULE, {vote, ElectionId}).
-
-%% @doc Returns the globally accessible name of `Voter'
--spec global_name(voter()) -> {?MODULE, voter()}.
-global_name(Voter) ->
-    {?MODULE, Voter}.
+%% @doc Collects the votes of `Voters'
+-spec collect_votes([voter()], evel:election_id(), timeout()) -> [vote()].
+collect_votes(Voters, ElectionId, Timeout) ->
+    {_, Monitor} =
+        spawn_monitor(
+          fun () ->
+                  _ = is_integer(Timeout) andalso erlang:send_after(Timeout, self(), timeout),
+                  Tag = make_ref(),
+                  ok = lists:foreach(
+                         fun (Voter) ->
+                                 _ = monitor(process, Voter),
+                                 gen_server:cast(Voter, {vote, {self(), Tag, ElectionId}})
+                         end,
+                         Voters),
+                  (fun Loop (0, Acc) -> exit({ok, Acc});
+                       Loop (N, Acc) ->
+                           receive
+                               {'DOWN', _, _, _, _} -> Loop(N - 1, Acc);
+                               {Tag, no_vote}       -> Loop(N - 1, Acc);
+                               {Tag, Vote}          -> Loop(N - 1, [Vote | Acc]);
+                               timeout              -> exit({ok, Acc})
+                           end
+                   end)(length(Voters), [])
+          end),
+    receive
+        {'DOWN', Monitor, _, _, Result} ->
+            case Result of
+                {ok, Votes} -> Votes;
+                _           -> []
+            end
+    end.
 
 %% @doc Converts `vote()' to `evel:leader()'
 -spec vote_to_leader(vote()) -> evel:leader().
@@ -79,6 +99,13 @@ vote_to_leader({_, Candidate, Agent}) ->
 get_agent({_, _, Agent}) ->
     Agent.
 
+%% @doc Gets the voter on the current node
+-spec self_voter() -> voter().
+self_voter() ->
+    Pid = whereis(?MODULE),
+    true = is_pid(Pid),
+    Pid.
+
 %%----------------------------------------------------------------------------------------------------------------------
 %% 'gen_server' Callback Functions
 %%----------------------------------------------------------------------------------------------------------------------
@@ -88,12 +115,12 @@ init([]) ->
     {ok, State}.
 
 %% @private
-handle_call({vote, Arg}, _From, State) ->
-    handle_vote(Arg, State);
 handle_call(Request, From, State) ->
     {stop, {unknown_call, Request, From}, State}.
 
 %% @private
+handle_cast({vote, Arg}, State) ->
+    handle_vote(Arg, State);
 handle_cast({solicit, Arg}, State) ->
     handle_solicit(Arg, State);
 handle_cast(Request, State) ->
@@ -140,12 +167,11 @@ handle_down(Agent, State0) ->
     State1 = remove_vote(Agent, State0),
     {noreply, State1}.
 
--spec handle_vote(evel:election_id(), #?STATE{}) -> {reply, vote() | no_vote, #?STATE{}}.
-handle_vote(ElectionId, State) ->
-    case maps:find(ElectionId, State#?STATE.votes) of
-        error      -> {reply, no_vote, State};
-        {ok, Vote} -> {reply, Vote, State}
-    end.
+-spec handle_vote({pid(), reference(), evel:election_id()}, #?STATE{}) -> {noreply, #?STATE{}}.
+handle_vote({Sender, Tag, ElectionId}, State) ->
+    Vote = maps:get(ElectionId, State#?STATE.votes, no_vote),
+    _ = Sender ! {Tag, Vote},
+    {noreply, State}.
 
 -spec remove_vote(evel_agent:agent(), #?STATE{}) -> #?STATE{}.
 remove_vote(Agent, State) ->

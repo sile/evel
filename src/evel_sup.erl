@@ -38,8 +38,6 @@ init([]) ->
          #{id => commission, start => {evel_commission, start_link, []}},
          #{id => voter, start => {evel_voter, start_link, []}},
          #{id => people, start => {evel_people, start_link, []}},
-
-         %% This depends on the `evel_people' process
          #{id => agent_sup, start => {evel_agent_sup, start_link, []}, type => supervisor}
         ],
     {ok, {#{strategy => rest_for_one}, Children}}.

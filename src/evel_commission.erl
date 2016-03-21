@@ -132,8 +132,7 @@ collect_votes(ElectionId, Options) ->
     Timeout = proplists:get_value(timeout, Options, 100),
     VoterCount = proplists:get_value(voter_count, Options, 5),
     Voters = evel_people:inquire_voters(ElectionId, VoterCount, false),
-    {Votes, _} = rpc:multicall(Voters, evel_voter, vote, [ElectionId], Timeout),
-    lists:filter(fun (V) -> V =/= no_vote end, Votes).
+    evel_voter:collect_votes(Voters, ElectionId, Timeout).
 
 -spec fetch_leader(evel:election_id(), [evel:find_option()]) -> ok.
 fetch_leader(ElectionId, Options) ->

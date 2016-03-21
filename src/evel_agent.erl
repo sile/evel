@@ -31,8 +31,6 @@
 %%----------------------------------------------------------------------------------------------------------------------
 %% Macros & Records & Types
 %%----------------------------------------------------------------------------------------------------------------------
--define(CHECK_VOTER_UP_INTERVAL, 5000).
-
 -define(STATE, ?MODULE).
 -record(?STATE,
         {
@@ -100,8 +98,6 @@ handle_info({'PERSON_LEAVE', Voter}, State) ->
     end;
 handle_info({'PERSON_JOIN', _}, State) ->
     handle_population_change(State);
-handle_info({check_voter_up, Arg}, State) ->
-    handle_check_voter_up(Arg, State);
 handle_info(Info, State) ->
     {stop, {unknown_info, Info}, State}.
 
@@ -124,18 +120,9 @@ handle_population_change(State0) ->
 -spec handle_voter_down(reference(), #?STATE{}) -> {noreply, #?STATE{}}.
 handle_voter_down(Ref, State) ->
     Voter = maps:get(Ref, State#?STATE.monitors),
+    Voters = ordsets:del_element(Voter, State#?STATE.voters),
     Monitors = maps:remove(Ref, State#?STATE.monitors),
-    ok = schedule_check_voter_up(Voter),
-    {noreply, State#?STATE{monitors = Monitors}}.
-
--spec handle_check_voter_up(evel_voter:voter(), #?STATE{}) -> {noreply, #?STATE{}}.
-handle_check_voter_up(Voter, State) ->
-    case ordsets:is_element(Voter, State#?STATE.voters) of
-        false -> {noreply, State}; % `Voter' have left
-        true  ->
-            Monitors = solicit_vote(Voter, State#?STATE.monitors, State),
-            {noreply, State#?STATE{monitors = Monitors}}
-    end.
+    {noreply, State#?STATE{monitors = Monitors, voters = Voters}}.
 
 -spec do_campaign(#?STATE{}) -> #?STATE{}.
 do_campaign(State) ->
@@ -164,14 +151,9 @@ do_campaign(State) ->
 
     State#?STATE{voters = Voters, monitors = Monitors1}.
 
--spec schedule_check_voter_up(evel_voter:voter()) -> ok.
-schedule_check_voter_up(Voter) ->
-    _ = erlang:send_after(?CHECK_VOTER_UP_INTERVAL, self(), {check_voter_up, Voter}),
-    ok.
-
 -spec solicit_vote(evel_voter:voter(), Monitors, #?STATE{}) -> Monitors when
       Monitors :: #{reference() => evel_voter:voter()}.
 solicit_vote(Voter, Monitors, State) ->
-    Monitor = monitor(process, evel_voter:global_name(Voter)),
+    Monitor = monitor(process, Voter),
     ok = evel_voter:solicit(Voter, State#?STATE.election_id, State#?STATE.vote),
     maps:put(Monitor, Voter, Monitors).

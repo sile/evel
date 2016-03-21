@@ -15,6 +15,8 @@
 %% Exported API
 %%----------------------------------------------------------------------------------------------------------------------
 -export([start_link/0]).
+-export([join/2]).
+-export([join_ack/2]).
 -export([inquire_voters/3]).
 
 -export_type([notification/0]).
@@ -57,10 +59,12 @@ inquire_voters(ElectionId, VoterCount, DoMonitor) ->
 %%----------------------------------------------------------------------------------------------------------------------
 %% @private
 init([]) ->
+    Voter = evel_voter:self_voter(),
+    ok = lists:foreach(fun (Node) -> join(Node, Voter) end, nodes()),
+
     ok = net_kernel:monitor_nodes(true),
     {ok, RingOptions} = application:get_env(hash_ring_options),
-    Voters = nodes([this, visible]),
-    People = hash_ring:make(hash_ring:list_to_nodes(Voters), RingOptions),
+    People = hash_ring:make([hash_ring_node:make(Voter)], RingOptions),
     State =
         #?STATE{
             people = People
@@ -74,14 +78,16 @@ handle_call(Request, From, State) ->
     {stop, {unknown_call, Request, From}, State}.
 
 %% @private
+handle_cast({join, Arg}, State) ->
+    handle_join(Arg, State);
 handle_cast(Request, State) ->
     {stop, {unknown_cast, Request}, State}.
 
 %% @private
 handle_info({nodeup, Node}, State) ->
     handle_nodeup(Node, State);
-handle_info({nodedown, Node}, State) ->
-    handle_nodedown(Node, State);
+handle_info({nodedown, _}, State) ->
+    {noreply, State};
 handle_info({'DOWN', _, _, Pid, _}, State) ->
     handle_down(Pid, State);
 handle_info(Info, State) ->
@@ -114,25 +120,46 @@ handle_inquire_voters({ElectionId, From, VoterCount, DoMonitor}, State) ->
         end,
     {reply, Voters, State#?STATE{listeners = Listeners}}.
 
+-spec handle_join({pid(), evel_voter:voter(), boolean()}, #?STATE{}) -> {noreply, #?STATE{}}.
+handle_join({Sender, Voter, NeedAck}, State) ->
+    case maps:is_key(Voter, hash_ring:get_nodes(State#?STATE.people)) of
+        true  -> {noreply, State};
+        false ->
+            _ = monitor(process, Voter),
+            People = hash_ring:add_node(hash_ring_node:make(Voter), State#?STATE.people),
+            ok = notify_change({'PERSON_JOIN', Voter}, State),
+            _ = NeedAck andalso join_ack(Sender, evel_voter:self_voter()),
+            {noreply, State#?STATE{people = People}}
+    end.
+
 -spec handle_down(pid(), #?STATE{}) -> {noreply, #?STATE{}}.
-handle_down(Listener, State) ->
-    Listeners = lists:delete(Listener, State#?STATE.listeners),
-    {noreply, State#?STATE{listeners = Listeners}}.
+handle_down(Pid, State) ->
+    People0 = State#?STATE.people,
+    People1 =
+        case maps:is_key(Pid, hash_ring:get_nodes(People0)) of
+            false -> People0;
+            true  ->
+                ok = notify_change({'PERSON_LEAVE', Pid}, State),
+                hash_ring:remove_node(Pid, People0)
+        end,
+    Listeners = lists:delete(Pid, State#?STATE.listeners),
+    {noreply, State#?STATE{listeners = Listeners, people = People1}}.
 
 -spec handle_nodeup(node(), #?STATE{}) -> {noreply, #?STATE{}}.
 handle_nodeup(Node, State) ->
-    People = hash_ring:add_node(hash_ring_node:make(Node), State#?STATE.people),
-    ok = notify_change({'PERSON_JOIN', Node}, State),
-    {noreply, State#?STATE{people = People}}.
-
--spec handle_nodedown(node(), #?STATE{}) -> {noreply, #?STATE{}}.
-handle_nodedown(Node, State) ->
-    People = hash_ring:remove_node(Node, State#?STATE.people),
-    ok = notify_change({'PERSON_LEAVE', Node}, State),
-    {noreply, State#?STATE{people = People}}.
+   _ = Node > node() andalso join(Node, evel_voter:self_voter()),
+    {noreply, State}.
 
 -spec notify_change(notification(), #?STATE{}) -> ok.
 notify_change(Message, State) ->
     lists:foreach(
       fun (Pid) -> Pid ! Message end,
       State#?STATE.listeners).
+
+-spec join(node(), evel_voter:voter()) -> ok.
+join(Node, Voter) ->
+    gen_server:cast({?MODULE, Node}, {join, {self(), Voter, true}}).
+
+-spec join_ack(pid(), evel_voter:voter()) -> ok.
+join_ack(Pid, Voter) ->
+    gen_server:cast(Pid, {join, {self(), Voter, false}}).
