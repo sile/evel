@@ -17,6 +17,9 @@ Memo
 遅いノードに影響を受けない(受けにくい):
 - globalの場合には、例えばCtrl-Zで止めたノードがいた場合には延々と(ノードが切断されるまで？)ブロックする
 
+TODO: globalとの比較
+- `rpc:multicall(global, register_name, [foo, self()]).`
+
 Definition
 ----------
 

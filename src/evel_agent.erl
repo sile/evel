@@ -41,11 +41,12 @@
           max_voter_count        :: pos_integer(),
           vote                   :: evel_voter:vote(),
           voters = ordsets:new() :: ordsets:ordset(evel_voter:voter()),
-          monitors = #{}         :: #{reference() => evel_voter:voter()}
+          monitors = #{}         :: monitors()
         }).
 
 -type start_arg() :: {evel:election_id(), evel:candidate(), [evel:elect_option()]}.
 -type agent() :: evel:certificate().
+-type monitors() :: #{evel_voter:voter() => reference()}.
 
 %%----------------------------------------------------------------------------------------------------------------------
 %% Exported Functions
@@ -110,8 +111,8 @@ handle_cast(Request, State) ->
 %% @private
 handle_info({'DOWN', _, _, Pid, Reason}, State = #?STATE{candidate = Pid}) ->
     {stop, {shutdown, {candidate_exited, Pid, Reason}}, State};
-handle_info({'DOWN', Ref, _, _, _}, State) ->
-    handle_voter_down(Ref, State);
+handle_info({'DOWN', _, _, Pid, _}, State) ->
+    handle_voter_down(Pid, State);
 handle_info({'PERSON_LEAVE', Voter}, State) ->
     case ordsets:is_element(Voter, State#?STATE.voters) of
         false -> {noreply, State};
@@ -138,11 +139,10 @@ handle_population_change(State0) ->
     State1 = do_campaign(State0),
     {noreply, State1}.
 
--spec handle_voter_down(reference(), #?STATE{}) -> {noreply, #?STATE{}}.
-handle_voter_down(Ref, State) ->
-    Voter = maps:get(Ref, State#?STATE.monitors),
+-spec handle_voter_down(evel_voter:voter(), #?STATE{}) -> {noreply, #?STATE{}}.
+handle_voter_down(Voter, State) ->
     Voters = ordsets:del_element(Voter, State#?STATE.voters),
-    Monitors = maps:remove(Ref, State#?STATE.monitors),
+    Monitors = maps:remove(Voter, State#?STATE.monitors),
     {noreply, State#?STATE{monitors = Monitors, voters = Voters}}.
 
 -spec do_campaign(#?STATE{}) -> #?STATE{}.
@@ -158,23 +158,19 @@ do_campaign(State) ->
           Joins),
 
     Leaves = ordsets:subtract(State#?STATE.voters, Voters),
-    Monitors1 =
-        maps:filter(
-          fun (Ref, Voter) ->
-                  case ordsets:is_element(Voter, Leaves) of
-                      false -> true;
-                      true  ->
-                          _ = demonitor(Ref, [flush]),
-                          false
-                  end
-          end,
-          Monitors0),
+    Monitors1 = ordsets:fold(fun cancel_vote/2, Monitors0, Leaves),
 
     State#?STATE{voters = Voters, monitors = Monitors1}.
 
--spec solicit_vote(evel_voter:voter(), Monitors, #?STATE{}) -> Monitors when
-      Monitors :: #{reference() => evel_voter:voter()}.
+-spec solicit_vote(evel_voter:voter(), monitors(), #?STATE{}) -> monitors().
 solicit_vote(Voter, Monitors, State) ->
     Monitor = monitor(process, Voter),
     ok = evel_voter:solicit(Voter, State#?STATE.election_id, State#?STATE.vote),
-    maps:put(Monitor, Voter, Monitors).
+    maps:put(Voter, Monitor, Monitors).
+
+-spec cancel_vote(evel_voter:voter(), monitors()) -> monitors().
+cancel_vote(Voter, Monitors) ->
+    Monitor = maps:get(Voter, Monitors),
+    _ = demonitor(Monitor, [flush]),
+    ok = evel_voter:cancel(Voter, self()),
+    maps:remove(Voter, Monitors).

@@ -16,6 +16,7 @@
 %%----------------------------------------------------------------------------------------------------------------------
 -export([start_link/0]).
 -export([solicit/3]).
+-export([cancel/2]).
 -export([collect_votes/3]).
 -export([vote_to_leader/1]).
 -export([get_agent/1]).
@@ -38,7 +39,7 @@
 -record(?STATE,
         {
           votes  = #{} :: #{evel:election_id() => vote()},
-          agents = #{} :: #{evel_agent:agent() => evel:election_id()}
+          agents = #{} :: #{evel_agent:agent() => {evel:election_id(), Monitor::reference()}}
         }).
 
 -type voter() :: pid().
@@ -57,6 +58,11 @@ start_link() ->
 -spec solicit(voter(), evel:election_id(), vote()) -> ok.
 solicit(Voter, ElectionId, Vote) ->
     gen_server:cast(Voter, {solicit, {ElectionId, Vote}}).
+
+%% @doc Cancels `Vote' for `Agent'
+-spec cancel(voter(), evel_agent:agent()) -> ok.
+cancel(Voter, Agent) ->
+    gen_server:cast(Voter, {cancel, Agent}).
 
 %% @doc Collects the votes of `Voters'
 -spec collect_votes([voter()], evel:election_id(), timeout()) -> [vote()].
@@ -131,6 +137,8 @@ handle_cast({vote, Arg}, State) ->
     handle_vote(Arg, State);
 handle_cast({solicit, Arg}, State) ->
     handle_solicit(Arg, State);
+handle_cast({cancel, Arg}, State) ->
+    handle_cancel(Arg, State);
 handle_cast(Request, State) ->
     {stop, {unknown_cast, Request}, State}.
 
@@ -156,9 +164,9 @@ handle_solicit({ElectionId, SolicitedVote}, State) ->
     case maps:find(ElectionId, State#?STATE.votes) of
         error ->
             Agent = get_agent(SolicitedVote),
-            _ = monitor(process, Agent),
+            Monitor = monitor(process, Agent),
             Votes = maps:put(ElectionId, SolicitedVote, State#?STATE.votes),
-            Agents = maps:put(Agent, ElectionId, State#?STATE.agents),
+            Agents = maps:put(Agent, {ElectionId, Monitor}, State#?STATE.agents),
             {noreply, State#?STATE{votes = Votes, agents = Agents}};
         {ok, SolicitedVote} ->
             {noreply, State};
@@ -169,6 +177,11 @@ handle_solicit({ElectionId, SolicitedVote}, State) ->
             ok = evel:dismiss(vote_to_leader(CurrentVote)),
             handle_solicit({ElectionId, SolicitedVote}, remove_vote(get_agent(CurrentVote), State))
     end.
+
+-spec handle_cancel(evel_agent:agent(), #?STATE{}) -> {noreply, #?STATE{}}.
+handle_cancel(Agent, State0) ->
+    State1 = remove_vote(Agent, State0),
+    {noreply, State1}.
 
 -spec handle_down(evel_agent:agent(), #?STATE{}) -> {noreply, #?STATE{}}.
 handle_down(Agent, State0) ->
@@ -184,8 +197,9 @@ handle_vote({Sender, Tag, ElectionId}, State) ->
 -spec remove_vote(evel_agent:agent(), #?STATE{}) -> #?STATE{}.
 remove_vote(Agent, State) ->
     case maps:find(Agent, State#?STATE.agents) of
-        error            -> State;
-        {ok, ElectionId} ->
+        error                       -> State;
+        {ok, {ElectionId, Monitor}} ->
+            _ = demonitor(Monitor, [flush]),
             Votes = maps:remove(ElectionId, State#?STATE.votes),
             Agents = maps:remove(Agent, State#?STATE.agents),
             State#?STATE{votes = Votes, agents = Agents}
