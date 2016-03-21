@@ -18,7 +18,7 @@
 %% Exported API
 %%----------------------------------------------------------------------------------------------------------------------
 -export([start_link/1]).
--export([start_campaign/2]).
+-export([start_campaign/3]).
 
 -export_type([start_arg/0]).
 -export_type([agent/0]).
@@ -31,21 +31,20 @@
 %%----------------------------------------------------------------------------------------------------------------------
 %% Macros & Records & Types
 %%----------------------------------------------------------------------------------------------------------------------
-%% FIXME: To be specified from the outside
--define(CHECK_VOTER_UP_INTERVAL, 1000).
--define(DECIDE_PRIORITY, erlang:system_time(micro_seconds)). % rand:uniform()).
+-define(CHECK_VOTER_UP_INTERVAL, 5000).
 
 -define(STATE, ?MODULE).
 -record(?STATE,
         {
           election_id            :: evel:election_id(),
           candidate              :: evel:candidate(),
+          max_voter_count        :: pos_integer(),
           vote                   :: evel_voter:vote(),
           voters = ordsets:new() :: ordsets:ordset(evel_voter:voter()),
           monitors = #{}         :: #{reference() => evel_voter:voter()}
         }).
 
--type start_arg() :: {evel:election_id(), evel:candidate()}.
+-type start_arg() :: {evel:election_id(), evel:candidate(), [evel:elect_option()]}.
 -type agent() :: evel:certificate().
 
 %%----------------------------------------------------------------------------------------------------------------------
@@ -57,22 +56,26 @@ start_link(Arg) ->
     gen_server:start_link(?MODULE, Arg, []).
 
 %% @doc Starts an election campaign for `Candidate'
--spec start_campaign(evel:election_id(), evel:candidate()) -> ok.
-start_campaign(ElectionId, Candidate) ->
-    {ok, _} = evel_agent_sup:start_child({ElectionId, Candidate}),
+-spec start_campaign(evel:election_id(), evel:candidate(), [evel:elect_option()]) -> ok.
+start_campaign(ElectionId, Candidate, Options) ->
+    {ok, _} = evel_agent_sup:start_child({ElectionId, Candidate, Options}),
     ok.
 
 %%----------------------------------------------------------------------------------------------------------------------
 %% 'gen_server' Callback Functions
 %%----------------------------------------------------------------------------------------------------------------------
 %% @private
-init({ElectionId, Candidate}) ->
+init({ElectionId, Candidate, Options}) ->
+    Priority = proplists:get_value(priority, Options, erlang:system_time(micro_seconds)),
+    VoterCount = proplists:get_value(voter_count, Options, 5),
+
     _ = monitor(process, Candidate),
     State0 =
         #?STATE{
-            election_id = ElectionId,
-            candidate   = Candidate,
-            vote        = {?DECIDE_PRIORITY, Candidate, self()}
+            election_id     = ElectionId,
+            candidate       = Candidate,
+            vote            = {Priority, Candidate, self()},
+            max_voter_count = VoterCount
            },
     State1 = do_campaign(State0),
     {ok, State1}.
@@ -136,7 +139,8 @@ handle_check_voter_up(Voter, State) ->
 
 -spec do_campaign(#?STATE{}) -> #?STATE{}.
 do_campaign(State) ->
-    Voters = ordsets:from_list(evel_people:inquire_voters(State#?STATE.election_id, true)),
+    Voters = ordsets:from_list(
+               evel_people:inquire_voters(State#?STATE.election_id, State#?STATE.max_voter_count, true)),
 
     Joins = ordsets:subtract(Voters, State#?STATE.voters),
     Monitors0 =

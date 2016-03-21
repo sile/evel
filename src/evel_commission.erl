@@ -15,9 +15,9 @@
 %% Exported API
 %%----------------------------------------------------------------------------------------------------------------------
 -export([start_link/0]).
--export([elect/2]).
+-export([elect/3]).
 -export([dismiss/1]).
--export([find_leader/1]).
+-export([find_leader/2]).
 -export([known_leaders/0]).
 
 %%----------------------------------------------------------------------------------------------------------------------
@@ -28,9 +28,6 @@
 %%----------------------------------------------------------------------------------------------------------------------
 %% Macros & Records & Types
 %%----------------------------------------------------------------------------------------------------------------------
-%% FIXME: To be specified from the outside
--define(COLLECT_VOTE_TIMEOUT, 1000).
-
 -define(STATE, ?MODULE).
 -record(?STATE,
         {
@@ -46,14 +43,14 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-%% @see evel:elect/2
--spec elect(evel:election_id(), evel:candidate()) -> evel:leader().
-elect(ElectionId, Candidate) ->
-    case find_leader(ElectionId) of
+%% @see evel:elect/3
+-spec elect(evel:election_id(), evel:candidate(), [evel:elect_option()]) -> evel:leader().
+elect(ElectionId, Candidate, Options) ->
+    case find_leader(ElectionId, Options) of
         {ok, Leader} -> Leader;
         error        ->
-            ok = evel_agent:start_campaign(ElectionId, Candidate),
-            {ok, Leader} = find_leader(ElectionId),
+            ok = evel_agent:start_campaign(ElectionId, Candidate, Options),
+            {ok, Leader} = find_leader(ElectionId, Options),
             Leader
     end.
 
@@ -63,13 +60,13 @@ dismiss({_, Agent}) ->
     _ = exit(Agent, kill),
     ok.
 
-%% @see evel:find_leader/1
--spec find_leader(evel:election_id()) -> {ok, evel:leader()} | error.
-find_leader(ElectionId) ->
+%% @see evel:find_leader/2
+-spec find_leader(evel:election_id(), [evel:find_option()]) -> {ok, evel:leader()} | error.
+find_leader(ElectionId, Options) ->
     case find_local(ElectionId) of
         {ok, Leader} -> {ok, Leader};
         error        ->
-            ok = fetch_leader(ElectionId),
+            ok = fetch_leader(ElectionId, Options),
             find_local(ElectionId)
     end.
 
@@ -130,15 +127,17 @@ find_local(ElectionId) ->
         _:_ -> error
     end.
 
--spec collect_votes(evel:election_id()) -> [evel_voter:vote()].
-collect_votes(ElectionId) ->
-    Voters = evel_people:inquire_voters(ElectionId, false),
-    {Votes, _} = rpc:multicall(Voters, evel_voter, vote, [ElectionId], ?COLLECT_VOTE_TIMEOUT),
+-spec collect_votes(evel:election_id(), [evel:find_option()]) -> [evel_voter:vote()].
+collect_votes(ElectionId, Options) ->
+    Timeout = proplists:get_value(timeout, Options, 100),
+    VoterCount = proplists:get_value(voter_count, Options, 5),
+    Voters = evel_people:inquire_voters(ElectionId, VoterCount, false),
+    {Votes, _} = rpc:multicall(Voters, evel_voter, vote, [ElectionId], Timeout),
     lists:filter(fun (V) -> V =/= no_vote end, Votes).
 
--spec fetch_leader(evel:election_id()) -> ok.
-fetch_leader(ElectionId) ->
-    case lists:sort(collect_votes(ElectionId)) of
+-spec fetch_leader(evel:election_id(), [evel:find_option()]) -> ok.
+fetch_leader(ElectionId, Options) ->
+    case lists:sort(collect_votes(ElectionId, Options)) of
         []                -> ok;
         [ElectedVote | _] -> gen_server:call(?MODULE, {record_leader, {ElectionId, ElectedVote}})
     end.

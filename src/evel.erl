@@ -10,9 +10,9 @@
 %%----------------------------------------------------------------------------------------------------------------------
 %% Exported API
 %%----------------------------------------------------------------------------------------------------------------------
--export([elect/2]).
+-export([elect/2, elect/3]).
 -export([dismiss/1]).
--export([find_leader/1]).
+-export([find_leader/1, find_leader/2]).
 -export([known_leaders/0]).
 -export([is_leader/1]).
 -export([get_winner/1]).
@@ -23,6 +23,8 @@
 -export_type([leader/0]).
 -export_type([winner/0]).
 -export_type([certificate/0]).
+-export_type([elect_option/0]).
+-export_type([find_option/0]).
 
 %%----------------------------------------------------------------------------------------------------------------------
 %% Types
@@ -33,22 +35,40 @@
 -type certificate() :: pid().
 -type leader()      :: {winner(), certificate()}.
 
+-type elect_option() :: {priority, term()}
+                      | find_option().
+
+-type find_option() :: {timeout, timeout()}
+                     | {voter_count, pos_integer()}.
+
 %%----------------------------------------------------------------------------------------------------------------------
 %% Exported Functions
 %%----------------------------------------------------------------------------------------------------------------------
+%% @equiv elect(ElectionId, Candidate, [])
 -spec elect(election_id(), candidate()) -> leader().
 elect(ElectionId, Candidate) ->
-    _ = is_pid(Candidate) orelse error(badarg, [ElectionId, Candidate]),
-    evel_commission:elect(ElectionId, Candidate).
+    elect(ElectionId, Candidate, []).
+
+-spec elect(election_id(), candidate(), [elect_option()]) -> leader().
+elect(ElectionId, Candidate, Options) ->
+    _ = is_pid(Candidate) orelse error(badarg, [ElectionId, Candidate, Options]),
+    _ = is_list(Options) orelse error(badarg, [ElectionId, Candidate, Options]),
+    evel_commission:elect(ElectionId, Candidate, Options).
 
 -spec dismiss(leader()) -> ok.
 dismiss(Leader) ->
     _ = is_leader(Leader) orelse error(badarg, [Leader]),
     evel_commission:dismiss(Leader).
 
+%% @equiv find_leader(ElectionId, [])
 -spec find_leader(election_id()) -> {ok, leader()} | error.
 find_leader(ElectionId) ->
-    evel_commission:find_leader(ElectionId).
+    find_leader(ElectionId, []).
+
+-spec find_leader(election_id(), [find_option()]) -> {ok, leader()} | error.
+find_leader(ElectionId, Options) ->
+    _ = is_list(Options) orelse error(badarg, [ElectionId, Options]),
+    evel_commission:find_leader(ElectionId, Options).
 
 -spec known_leaders() -> [{election_id(), leader()}].
 known_leaders() ->

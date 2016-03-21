@@ -15,7 +15,7 @@
 %% Exported API
 %%----------------------------------------------------------------------------------------------------------------------
 -export([start_link/0]).
--export([inquire_voters/2]).
+-export([inquire_voters/3]).
 
 -export_type([notification/0]).
 
@@ -27,10 +27,6 @@
 %%----------------------------------------------------------------------------------------------------------------------
 %% Macros & Records & Types
 %%----------------------------------------------------------------------------------------------------------------------
-%% FIXME: To be specified from the outside
--define(HASH_RING_OPTIONS, [{module, hash_ring_dynamic}, {virtual_node_count, 64}]).
--define(PER_ELECTION_VOTER_COUNT, 5).
-
 -define(STATE, ?MODULE).
 -record(?STATE,
         {
@@ -52,9 +48,9 @@ start_link() ->
 %% @doc Inquires voters who are concerned with the election
 %%
 %% If `DoMonitor' is `true', the caller will receive `notification()' messages when the population has changed.
--spec inquire_voters(evel:election_id(), boolean()) -> [evel_voter:voter()].
-inquire_voters(ElectionId, DoMonitor) ->
-    gen_server:call(?MODULE, {inquire_voters, {ElectionId, self(), DoMonitor}}).
+-spec inquire_voters(evel:election_id(), pos_integer(), boolean()) -> [evel_voter:voter()].
+inquire_voters(ElectionId, VoterCount, DoMonitor) ->
+    gen_server:call(?MODULE, {inquire_voters, {ElectionId, self(), VoterCount, DoMonitor}}).
 
 %%----------------------------------------------------------------------------------------------------------------------
 %% 'gen_server' Callback Functions
@@ -62,8 +58,9 @@ inquire_voters(ElectionId, DoMonitor) ->
 %% @private
 init([]) ->
     ok = net_kernel:monitor_nodes(true),
+    {ok, RingOptions} = application:get_env(hash_ring_options),
     Voters = nodes([this, visible]),
-    People = hash_ring:make(hash_ring:list_to_nodes(Voters), ?HASH_RING_OPTIONS),
+    People = hash_ring:make(hash_ring:list_to_nodes(Voters), RingOptions),
     State =
         #?STATE{
             people = People
@@ -101,14 +98,13 @@ code_change(_OlsVsn, State, _Extra) ->
 %%----------------------------------------------------------------------------------------------------------------------
 %% Internal Functions
 %%----------------------------------------------------------------------------------------------------------------------
--spec handle_inquire_voters({evel:election_id(), pid(), boolean()}, #?STATE{}) ->
+-spec handle_inquire_voters({evel:election_id(), pid(), pos_integer(), boolean()}, #?STATE{}) ->
                                    {reply, [evel_voter:voter()], #?STATE{}}.
-handle_inquire_voters({ElectionId, From, DoMonitor}, State) ->
-    Count = ?PER_ELECTION_VOTER_COUNT,
+handle_inquire_voters({ElectionId, From, VoterCount, DoMonitor}, State) ->
     Voters =
         lists:map(
           fun hash_ring_node:get_key/1,
-          hash_ring:collect_nodes(ElectionId, Count, State#?STATE.people)),
+          hash_ring:collect_nodes(ElectionId, VoterCount, State#?STATE.people)),
     Listeners =
         case DoMonitor of
             false -> State#?STATE.listeners;
