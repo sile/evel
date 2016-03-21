@@ -54,7 +54,6 @@ dismiss_test(_Config) ->
     Leader = evel:elect(foo, self()),
     {ok, Leader} = evel:find_leader(foo),
     ok = evel:dismiss(Leader, [{unlink, true}]),
-    timer:sleep(10),
     error = evel:find_leader(foo).
 
 remote_elect_test(_Config) ->

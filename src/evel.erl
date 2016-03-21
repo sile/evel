@@ -43,7 +43,8 @@
 -type find_option() :: {timeout, timeout()}
                      | {voter_count, pos_integer()}.
 
--type dismiss_option() :: {unlink, boolean()}.
+-type dismiss_option() :: {unlink, boolean()}
+                        | {async, boolean()}.
 
 %%----------------------------------------------------------------------------------------------------------------------
 %% Exported Functions
@@ -72,7 +73,8 @@ dismiss(Leader, Options) ->
             false -> ok;
             true  -> catch evel_agent:unlink_candidate(get_certificate(Leader))
         end,
-    evel_commission:dismiss(Leader).
+    Async = proplists:get_value(async, Options, false),
+    evel_commission:dismiss(Leader, Async).
 
 %% @equiv find_leader(ElectionId, [])
 -spec find_leader(election_id()) -> {ok, leader()} | error.

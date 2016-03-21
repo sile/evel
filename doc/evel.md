@@ -39,7 +39,7 @@ certificate() = pid()
 
 
 <pre><code>
-dismiss_option() = {unlink, boolean()}
+dismiss_option() = {unlink, boolean()} | {async, boolean()}
 </code></pre>
 
 

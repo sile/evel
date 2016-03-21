@@ -16,7 +16,7 @@
 %%----------------------------------------------------------------------------------------------------------------------
 -export([start_link/0]).
 -export([elect/3]).
--export([dismiss/1]).
+-export([dismiss/2]).
 -export([find_leader/2]).
 -export([known_leaders/0]).
 
@@ -54,11 +54,24 @@ elect(ElectionId, Candidate, Options) ->
             Leader
     end.
 
-%% @see evel:dismiss/1
--spec dismiss(evel:leader()) -> ok.
-dismiss({_, Agent}) ->
-    _ = exit(Agent, kill),
-    ok.
+%% @see evel:dismiss/2
+-spec dismiss(evel:leader(), boolean()) -> ok.
+dismiss({_, Agent}, Async) ->
+    case Async of
+        true ->
+            _ = exit(Agent, kill),
+            ok;
+        false ->
+            Voters =
+                try
+                    element(3, evel_agent:get_summary(Agent))
+                catch
+                    _:_ -> []
+                end,
+            _ = exit(Agent, kill),
+            ok = lists:foreach(fun (Voter) -> evel_voter:cancel(Voter, Agent) end, Voters),
+            gen_server:call(?MODULE, {cancel, Agent})
+    end.
 
 %% @see evel:find_leader/2
 -spec find_leader(evel:election_id(), [evel:find_option()]) -> {ok, evel:leader()} | error.
@@ -94,6 +107,8 @@ init([]) ->
 %% @private
 handle_call({record_leader, Arg}, _From, State) ->
     handle_record_leader(Arg, State);
+handle_call({cancel, Arg}, _From, State) ->
+    handle_cancel(Arg, State);
 handle_call(Request, From, State) ->
     {stop, {unknown_call, Request, From}, State}.
 
@@ -145,10 +160,10 @@ fetch_leader(ElectionId, Options) ->
 handle_record_leader(Arg = {ElectionId, Vote}, State) ->
     case compete_with_present_vote(ElectionId, Vote, State) of
         {lose, Winner} ->
-            _ = Winner =/= Vote andalso dismiss(evel_voter:vote_to_leader(Vote)),
+            _ = Winner =/= Vote andalso dismiss(evel_voter:vote_to_leader(Vote), true),
             {reply, ok, State};
         {win, Loser} ->
-            ok = dismiss(evel_voter:vote_to_leader(Loser)),
+            ok = dismiss(evel_voter:vote_to_leader(Loser), true),
             handle_record_leader(Arg, remove_leader(evel_voter:get_agent(Loser), State));
         bye ->
             Agent = evel_voter:get_agent(Vote),
@@ -171,6 +186,10 @@ compete_with_present_vote(ElectionId, Vote, State) ->
             end
     end.
 
+-spec handle_cancel(evel_agent:agent(), #?STATE{}) -> {reply, ok, #?STATE{}}.
+handle_cancel(Agent, State) ->
+    {reply, ok, remove_leader(Agent, State)}.
+
 -spec handle_down(evel_agent:agent(), #?STATE{}) -> {noreply, #?STATE{}}.
 handle_down(Agent, State) ->
     {noreply, remove_leader(Agent, State)}.
@@ -178,7 +197,7 @@ handle_down(Agent, State) ->
 -spec remove_leader(evel_agent:agent(), #?STATE{}) -> #?STATE{}.
 remove_leader(Agent, State) ->
     case maps:find(Agent, State#?STATE.agents) of
-        error                 -> State; % `Agent' was already removed in `handle_record_leader/2'
+        error                 -> State;
         {ok, {ElectionId, _}} ->
             Agents = maps:remove(Agent, State#?STATE.agents),
             _ = ets:delete(State#?STATE.elections, ElectionId),
