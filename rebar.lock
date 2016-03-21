@@ -1,4 +1,1 @@
-[{<<"hash_ring">>,
-  {git,"https://github.com/sile/hash_ring.git",
-       {ref,"f90c35baeb7da589ed7386b890ab6c3492e51eb1"}},
-  0}].
+[{<<"hash_ring">>,{pkg,<<"hash_ring">>,<<"0.4.0">>},0}].

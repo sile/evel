@@ -63,7 +63,7 @@ inquire_voters(ElectionId, DoMonitor) ->
 init([]) ->
     ok = net_kernel:monitor_nodes(true),
     Voters = nodes([this, visible]),
-    People = hash_ring:make(lists:map(fun hash_ring_node:make/1, Voters), ?HASH_RING_OPTIONS),
+    People = hash_ring:make(hash_ring:list_to_nodes(Voters), ?HASH_RING_OPTIONS),
     State =
         #?STATE{
             people = People
