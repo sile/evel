@@ -50,8 +50,7 @@ elect(ElectionId, Candidate, Options) ->
         {ok, Leader} -> Leader;
         error        ->
             ok = evel_agent:start_campaign(ElectionId, Candidate, Options),
-            {ok, Leader} = find_leader(ElectionId, Options),
-            Leader
+            elect(ElectionId, Candidate, Options)
     end.
 
 %% @see evel:dismiss/2
@@ -179,7 +178,7 @@ compete_with_present_vote(ElectionId, Vote, State) ->
     case ets:lookup(State#?STATE.elections, ElectionId) of
         []               -> bye;
         [{_, Contender}] ->
-            {_, ContendVote} = maps:get(evel_voter:get_agent(Contender), State#?STATE.agents),
+            {_, ContendVote} = maps:get(evel:get_certificate(Contender), State#?STATE.agents),
             case ContendVote =< Vote of
                 true  -> {lose, ContendVote};
                 false -> {win, ContendVote}
