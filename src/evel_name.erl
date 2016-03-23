@@ -7,12 +7,12 @@
 %%
 %% This module is available as a `via' callback module for OTP behaviours (e.g., supervisor, gen_server, etc).
 %%
-%% ```
+%% <pre lang="erlang">
 %% %%
 %% %% Example
 %% %%
 %% gen_server:start_link({via, evel_name, SomeName}, ?MODULE, [], []).
-%% '''
+%% </pre>
 %%
 %% @end
 -module(evel_name).

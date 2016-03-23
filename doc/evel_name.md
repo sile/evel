@@ -14,7 +14,8 @@ An evel based global name registration facility.
 
 This module is available as a `via` callback module for OTP behaviours (e.g., supervisor, gen_server, etc).
 
-```
+```erlang
+
   %%
   %% Example
   %%

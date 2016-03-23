@@ -8,13 +8,15 @@
 %% This module provides functionality to elect the leader
 %% which will be eventually agreed by all member of the same distributed erlang cluster.
 %%
-%% ```
+%% <pre lang="erlang">
 %% %%
 %% %% Elects the leader
 %% %%
 %% > Leader = evel:elect(foo, self()).
 %%
+%% %%
 %% %% Finds the leader of an election
+%% %%
 %% > {ok, Leader} = evel:find_leader(foo).
 %% > error = evel:find_leader(bar).
 %%
@@ -23,7 +25,7 @@
 %% %%
 %% > ok = evel:dismiss(foo).
 %% > error = evel:find_leader(foo).
-%% '''
+%% </pre>
 %%
 %% @end
 -module(evel).

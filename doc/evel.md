@@ -15,12 +15,15 @@ An Eventual Leader Election Library.
 This module provides functionality to elect the leader
 which will be eventually agreed by all member of the same distributed erlang cluster.
 
-```
+```erlang
+
   %%
   %% Elects the leader
   %%
   > Leader = evel:elect(foo, self()).
+  %%
   %% Finds the leader of an election
+  %%
   > {ok, Leader} = evel:find_leader(foo).
   > error = evel:find_leader(bar).
   %%
