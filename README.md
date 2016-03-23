@@ -30,17 +30,70 @@ Definition
 Build
 -----
 
+To build the library for stand-alone usage:
 ```sh
-$ rebar3 compile
+$ git clone https://github.com/sile/evel.git
+$ cd evel
+$ ./rebar3 compile
+$ ./rebar3 shell
+$ > evel:module_info().
+```
+
+If you want to use from your application:
+```erlang
+%% In your 'rebar.config'
+
+%% Add following lines
+{deps,
+ [
+   evel
+ ]}.
 ```
 
 Example
 -------
 
 ```erlang
-$ make start
-> Leader = evel:elect(foo, self()).
+$ ./rebar3 shell --sname master
+
+%%
+%% Starts 10 slave nodes
+%%
+> ok = evel_debug:slave_start_link_n(10).
+> nodes().
+['1@localhost','2@localhost','3@localhost','4@localhost',
+'5@localhost','6@localhost','7@localhost','8@localhost',
+'9@localhost','10@localhost']
+
+%%
+%% Elects the leader from among following candidates
+%%
+> Candidates = [spawn(timer, sleep, [infinity]) || _ <- lists:seq(1, 100)].
+> rpc:parallel_eval([{evel, elect, [foo, Candidate]} || Candidate <- Candidates]).
+
+%%
+%% Finds the elected leader
+%%
 > {ok, Leader} = evel:find_leader(foo).
-> evel:dismiss(Leader).
+> {Results0, []} = rpc:multicall(evel, find_leader, [foo]).
+> lists:foreach(fun (R) -> {ok, Leader} = R end, Results0). % All nodes agree with the single leader
+
+%%
+%% Dismisses the leader
+%%
+> ok = evel:dismiss(Leader).
 > error = evel:find_leader(foo).
+> {Results1, []} = rpc:multicall(evel, find_leader, [foo]).
+> lists:foreach(fun (R) -> error = R end, Results1).
 ```
+
+API
+---
+
+See [EDoc Documents](doc/README.md)
+
+License
+-------
+
+This library is released under the MIT License.
+See the [LICENSE](LICENSE) file for full license information.
