@@ -1,7 +1,7 @@
 evel
 =====
 
-An Eventual Leader Election Library for Erlang
+`evel` is a distributed leader election library which has eventual consistency.
 
 Memo
 ----
