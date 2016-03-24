@@ -1,7 +1,7 @@
 %% vim: set ft=erlang : -*- erlang -*-
 {application, evel,
  [{description, "An Eventual Leader Election Library for Erlang"},
-  {vsn, git},
+  {vsn, "0.1.0"},
   {registered, [evel_sup, evel_people, evel_voter, evel_commission, evel_agent_sup]},
   {mod, { evel_app, []}},
   {applications,
