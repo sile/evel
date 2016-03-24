@@ -59,7 +59,7 @@ start_link(Arg) ->
 %% @doc Starts an election campaign for `Candidate'
 -spec start_campaign(evel:election_id(), evel:candidate(), [evel:elect_option()]) -> ok.
 start_campaign(ElectionId, Candidate, Options) ->
-    {ok, _} = evel_agent_sup:start_child({ElectionId, Candidate, Options}),
+    _ = evel_agent_sup:start_child({ElectionId, Candidate, Options}),
     ok.
 
 %% @doc Removes the link between `Agent' and the corresponding candidate process
