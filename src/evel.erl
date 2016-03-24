@@ -160,6 +160,9 @@ find_leader(ElectionId) ->
     find_leader(ElectionId, []).
 
 %% @doc Finds the leader elected in the election
+%%
+%% If own node have already known the leader, this function will retrieve it from local ETS.
+%% Otherwise it will try fetching the election result from remote nodes.
 -spec find_leader(election_id(), [find_option()]) -> {ok, leader()} | error.
 find_leader(ElectionId, Options) ->
     _ = is_list(Options) orelse error(badarg, [ElectionId, Options]),

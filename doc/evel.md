@@ -246,6 +246,9 @@ find_leader(ElectionId::<a href="#type-election_id">election_id()</a>, Options::
 
 Finds the leader elected in the election
 
+If own node have already known the leader, this function will retrieve it from local ETS.
+Otherwise it will try fetching the election result from remote nodes.
+
 <a name="get_certificate-1"></a>
 
 ### get_certificate/1 ###
