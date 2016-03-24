@@ -12,7 +12,7 @@ It is unaffected by the cluster size to which they belong.
 
 `evel` provides weaker consistency than [global](http://erlang.org/doc/man/global.html) which can be regarded as OTP's leader election module.
 But it is more scalable and has higher availability (e.g., more tolarent to timing failures of some nodes in the same cluster).
-See [Comparison with the global module](#todo) for more details.
+See [Comparison with the global module](#comparison-with-the-global-module) for more details.
 
 Build
 -----
