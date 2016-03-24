@@ -1,6 +1,8 @@
 evel
 =====
 
+[![hex.pm version](https://img.shields.io/hexpm/v/evel.svg)](https://hex.pm/packages/evel)
+
 `evel` is a distributed leader election library which has eventual consistency.
 
 If the nodes which have started `evel` application eventually agree with the same member list (usually distributed erlang ensures it),
