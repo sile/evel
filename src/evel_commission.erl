@@ -73,7 +73,7 @@ dismiss({_, Agent}, Async) ->
     end.
 
 %% @see evel:find_leader/2
--spec find_leader(evel:election_id(), [evel:find_option()]) -> {ok, evel:leader()} | error.
+-spec find_leader(evel:election_id(), [evel:find_option() | term()]) -> {ok, evel:leader()} | error.
 find_leader(ElectionId, Options) ->
     case find_local(ElectionId) of
         {ok, Leader} -> {ok, Leader};
