@@ -1,22 +1,14 @@
-%% vim: set ft=erlang : -*- erlang -*-
-{application, evel,
- [{description, "An Eventual Leader Election Library for Erlang"},
-  {vsn, "0.1.0"},
-  {registered, [evel_sup, evel_people, evel_voter, evel_commission, evel_agent_sup]},
-  {mod, { evel_app, []}},
-  {applications,
-   [kernel,
-    stdlib,
-    hash_ring
-   ]},
-  {env,
-   [
-    {hash_ring_options,
-     [{module, hash_ring_dynamic}, {virtual_node_count, 64}]}
-   ]},
-  {modules, []},
-
-  {maintainers, ["Takeru Ohta"]},
-  {licenses, ["MIT"]},
-  {links, [{"GitHub","https://github.com/sile/evel"}]}
- ]}.
+{application,evel,
+    [{description,"An Eventual Leader Election Library for Erlang"},
+     {vsn,"0.1.1"},
+     {registered,
+         [evel_sup,evel_people,evel_voter,evel_commission,evel_agent_sup]},
+     {mod,{evel_app,[]}},
+     {applications,[kernel,stdlib,hash_ring]},
+     {env,
+         [{hash_ring_options,
+              [{module,hash_ring_dynamic},{virtual_node_count,64}]}]},
+     {modules,[]},
+     {maintainers,["Takeru Ohta"]},
+     {licenses,["MIT"]},
+     {links,[{"GitHub","https://github.com/sile/evel"}]}]}.
