@@ -52,14 +52,14 @@ concurrent_test_() ->
                          spawn_link(
                            fun () ->
                                    evel:elect(foo, self(), [{link, false}, {priority, -I}]),
-                                   timer:sleep(50),
+                                   timer:sleep(100),
                                    Result = evel:find_leader(foo),
                                    Parent ! {'FIND', Result},
                                    timer:sleep(infinity)
                            end)
                  end,
                  lists:seq(1, Concurrency)),
-               timer:sleep(50),
+               timer:sleep(100),
 
                %% Eventually all members agree with a sigle leader
                {ok, Leader} = evel:find_leader(foo),
