@@ -1,4 +1,4 @@
-%% Copyright (c) 2016 Takeru Ohta <phjgt308@gmail.com>
+%% @copyright 2016 Takeru Ohta <phjgt308@gmail.com>
 %%
 %% This software is released under the MIT License.
 %% See the LICENSE file in the project root for full license information.
@@ -7,12 +7,12 @@
 %%
 %% This module is available as a `via' callback module for OTP behaviours (e.g., supervisor, gen_server, etc).
 %%
-%% <pre lang="erlang">
+%% ```
 %% %%
 %% %% Example
 %% %%
 %% gen_server:start_link({via, evel_name, SomeName}, ?MODULE, [], []).
-%% </pre>
+%% '''
 %%
 %% @end
 -module(evel_name).
