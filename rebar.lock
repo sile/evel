@@ -1,6 +1,16 @@
 {"1.1.0",
-[{<<"hash_ring">>,{pkg,<<"hash_ring">>,<<"0.4.0">>},0}]}.
+[{<<"hash_ring">>,{pkg,<<"hash_ring">>,<<"0.4.0">>},0},
+ {<<"jaeger_passage">>,{pkg,<<"jaeger_passage">>,<<"0.1.4">>},0},
+ {<<"local">>,{pkg,<<"local">>,<<"0.2.0">>},1},
+ {<<"otp_passage">>,{pkg,<<"otp_passage">>,<<"0.1.1">>},0},
+ {<<"passage">>,{pkg,<<"passage">>,<<"0.2.0">>},0},
+ {<<"thrift_protocol">>,{pkg,<<"thrift_protocol">>,<<"0.1.2">>},1}]}.
 [
 {pkg_hash,[
- {<<"hash_ring">>, <<"5B6FC75DA078865DD0E0007E4145A3E27FF07963E090F822FF99349A577296ED">>}]}
+ {<<"hash_ring">>, <<"5B6FC75DA078865DD0E0007E4145A3E27FF07963E090F822FF99349A577296ED">>},
+ {<<"jaeger_passage">>, <<"EFE13543DB015506C7BC658202D2250CFB6E8EBAE6155A712EB7FF9D6944A8A7">>},
+ {<<"local">>, <<"91466ED42F5E3509E097C4F57ED58C03362D64D537EF8B4AF0CA90774F7DBAD3">>},
+ {<<"otp_passage">>, <<"34AA7FB2A513B86AF9F847EFD120C0ECA70958FF55C0696A999CFAAE35F69820">>},
+ {<<"passage">>, <<"93CD303CFEAB1AB9F474FC648C1B24E543CB48247AFC641DB4AAB85F7A20E21B">>},
+ {<<"thrift_protocol">>, <<"A3741E439567F6D7D232ACFF42AFF9ED317A1A32BF5F7EB1CC89F90DDEA0361B">>}]}
 ].

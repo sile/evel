@@ -50,32 +50,34 @@
 %% Exported Functions
 %%----------------------------------------------------------------------------------------------------------------------
 %% @doc Starts a voter process
+-passage_trace([]).
 -spec start_link() -> {ok, pid()} | {error, Reason::term()}.
 start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+    gen_server_passage:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %% @doc Solicits `Vote' from `Voter'
+-passage_trace([{tags, #{voter => "Voter", election_id => "ElectionId", vote => "Vote"}}]).
 -spec solicit(voter(), evel:election_id(), vote()) -> ok.
 solicit(Voter, ElectionId, Vote) ->
-    gen_server:cast(Voter, {solicit, {ElectionId, Vote}}).
+    gen_server_passage:cast(Voter, {solicit, {ElectionId, Vote}}).
 
 %% @doc Cancels `Vote' for `Agent'
+-passage_trace([{tags, #{voter => "Voter", agent => "Agent"}}]).
 -spec cancel(voter(), evel_agent:agent()) -> ok.
 cancel(Voter, Agent) ->
-    gen_server:cast(Voter, {cancel, Agent}).
+    gen_server_passage:cast(Voter, {cancel, Agent}).
 
 %% @doc Collects the votes of `Voters'
+-passage_trace([{tags, #{voters => "Voters", election_id => "ElectionId"}}]).
 -spec collect_votes([voter()], evel:election_id(), timeout()) -> [vote()].
 collect_votes(Voters, ElectionId, Timeout) ->
-    {_, Monitor} =
-        spawn_monitor(
-          fun () ->
+    Fun = fun () ->
                   _ = is_integer(Timeout) andalso erlang:send_after(Timeout, self(), timeout),
                   Tag = make_ref(),
                   ok = lists:foreach(
                          fun (Voter) ->
                                  _ = monitor(process, Voter),
-                                 gen_server:cast(Voter, {vote, {self(), Tag, ElectionId}})
+                                 gen_server_passage:cast(Voter, {vote, {self(), Tag, ElectionId}})
                          end,
                          Voters),
                   (fun Loop (0, Acc) -> exit({ok, Acc});
@@ -87,7 +89,10 @@ collect_votes(Voters, ElectionId, Timeout) ->
                                timeout              -> exit({ok, Acc})
                            end
                    end)(length(Voters), [])
-          end),
+          end,
+    Span = passage_pd:current_span(),
+    {_, Monitor} =
+        spawn_monitor(fun () -> passage_pd:with_parent_span({child_of, Span}, Fun) end),
     receive
         {'DOWN', Monitor, _, _, Result} ->
             case Result of
@@ -107,9 +112,10 @@ get_agent({_, _, Agent}) ->
     Agent.
 
 %% @doc Gets the current votes
+-passage_trace([]).
 -spec get_votes() -> [{evel:election_id(), vote()}].
 get_votes() ->
-    gen_server:call(?MODULE, get_votes).
+    gen_server_passage:call(?MODULE, get_votes).
 
 %% @doc Gets the voter on the current node
 -spec self_voter() -> voter().
@@ -188,6 +194,7 @@ handle_down(Agent, State0) ->
     State1 = remove_vote(Agent, State0),
     {noreply, State1}.
 
+-passage_trace([{tags, #{sender => "Sender", tag => "Tag", election_id => "ElectionId"}}]).
 -spec handle_vote({pid(), reference(), evel:election_id()}, #?STATE{}) -> {noreply, #?STATE{}}.
 handle_vote({Sender, Tag, ElectionId}, State) ->
     Vote = maps:get(ElectionId, State#?STATE.votes, no_vote),

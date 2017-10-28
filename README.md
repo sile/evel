@@ -200,6 +200,24 @@ $ ./rebar3 shell --sname master
  {bar,{<10735.305.0>,<10735.307.0>}}]
 ```
 
+Jaeger Tracing
+---------------
+
+```
+$ docker run -d -p6831:6831/udp -p6832:6832/udp -p16686:16686 jaegertracing/all-in-one:latest
+```
+
+```
+$ rebar3 shell --sname foo
+> ok = evel_debug:slave_start_link_n(5).
+> rpc:eval_everywhere(jaeger_passage, start_tracer, [tracer, passage_sampler_all:new()]).
+> passage_pd:with_span(elect, [{tracer, tracer}], fun () -> evel:elect(foo, self()) end).
+```
+
+```
+$ firefox http://localhost:16686/
+```
+
 License
 -------
 

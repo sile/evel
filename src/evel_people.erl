@@ -44,21 +44,24 @@
 %% Exported Functions
 %%----------------------------------------------------------------------------------------------------------------------
 %% @doc Starts a process
+-passage_trace([]).
 -spec start_link() -> {ok, pid()} | {error, Reason::term()}.
 start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+    gen_server_passage:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %% @doc Inquires voters who are concerned with the election
 %%
 %% If `DoMonitor' is `true', the caller will receive `notification()' messages when the population has changed.
+-passage_trace([{tags, #{election_id => "ElectionId", voters => "VoterCount", monitor => "DoMonitor"}}]).
 -spec inquire_voters(evel:election_id(), pos_integer(), boolean()) -> [evel_voter:voter()].
 inquire_voters(ElectionId, VoterCount, DoMonitor) ->
-    gen_server:call(?MODULE, {inquire_voters, {ElectionId, self(), VoterCount, DoMonitor}}).
+    gen_server_passage:call(?MODULE, {inquire_voters, {ElectionId, self(), VoterCount, DoMonitor}}).
 
 %% @doc Gets the known people list
+-passage_trace([]).
 -spec get_people() -> [evel_voter:voter()].
 get_people() ->
-    gen_server:call(?MODULE, get_people).
+    gen_server_passage:call(?MODULE, get_people).
 
 %%----------------------------------------------------------------------------------------------------------------------
 %% 'gen_server' Callback Functions
@@ -167,8 +170,8 @@ notify_change(Message, State) ->
 
 -spec join(node(), evel_voter:voter()) -> ok.
 join(Node, Voter) ->
-    gen_server:cast({?MODULE, Node}, {join, {self(), Voter, true}}).
+    gen_server_passage:cast({?MODULE, Node}, {join, {self(), Voter, true}}).
 
 -spec join_ack(pid(), evel_voter:voter()) -> ok.
 join_ack(Pid, Voter) ->
-    gen_server:cast(Pid, {join, {self(), Voter, false}}).
+    gen_server_passage:cast(Pid, {join, {self(), Voter, false}}).

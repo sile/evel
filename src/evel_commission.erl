@@ -39,11 +39,13 @@
 %% Exported Functions
 %%----------------------------------------------------------------------------------------------------------------------
 %% @doc Starts a process
+-passage_trace([]).
 -spec start_link() -> {ok, pid()} | {error, Reason::term()}.
 start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+    gen_server_passage:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %% @see evel:elect/3
+-passage_trace([{tags, #{election_id => "ElectionId", candidate => "Candidate"}}]).
 -spec elect(evel:election_id(), evel:candidate(), [evel:elect_option()]) -> evel:leader().
 elect(ElectionId, Candidate, Options) ->
     case find_leader(ElectionId, Options) of
@@ -54,6 +56,7 @@ elect(ElectionId, Candidate, Options) ->
     end.
 
 %% @see evel:dismiss/2
+-passage_trace([{tags, #{agent => "Agent", async => "Async"}}]).
 -spec dismiss(evel:leader(), boolean()) -> ok.
 dismiss({_, Agent}, Async) ->
     case Async of
@@ -69,10 +72,11 @@ dismiss({_, Agent}, Async) ->
                 end,
             _ = exit(Agent, kill),
             ok = lists:foreach(fun (Voter) -> evel_voter:cancel(Voter, Agent) end, Voters),
-            gen_server:call(?MODULE, {cancel, Agent})
+            gen_server_passage:call(?MODULE, {cancel, Agent})
     end.
 
 %% @see evel:find_leader/2
+-passage_trace([{tags, #{election_id => "ElectionId"}}]).
 -spec find_leader(evel:election_id(), [evel:find_option() | term()]) -> {ok, evel:leader()} | error.
 find_leader(ElectionId, Options) ->
     case find_local(ElectionId) of
@@ -83,6 +87,7 @@ find_leader(ElectionId, Options) ->
     end.
 
 %% @see evel:known_leaders/0
+-passage_trace([]).
 -spec known_leaders() -> [{evel:election_id(), evel:leader()}].
 known_leaders() ->
     try
@@ -152,7 +157,7 @@ collect_votes(ElectionId, Options) ->
 fetch_leader(ElectionId, Options) ->
     case lists:sort(collect_votes(ElectionId, Options)) of
         []                -> ok;
-        [ElectedVote | _] -> gen_server:call(?MODULE, {record_leader, {ElectionId, ElectedVote}})
+        [ElectedVote | _] -> gen_server_passage:call(?MODULE, {record_leader, {ElectionId, ElectedVote}})
     end.
 
 -spec handle_record_leader({evel:election_id(), evel_voter:vote()}, #?STATE{}) -> {reply, ok, #?STATE{}}.

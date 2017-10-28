@@ -128,6 +128,7 @@ elect(ElectionId, Candidate) ->
 %% If you are interested in the expiration of the term of office (or the dismissal) of a leader,
 %% please you monitor the certificate process (i.e., `monitor(process, evel:get_certificate(Leader))').
 %% The down of the certificate process indicates the retirement of the leader.
+-passage_trace([{tags, #{election_id => "ElectionId", candidate => "Candidate"}}]).
 -spec elect(election_id(), candidate(), [elect_option()]) -> Leader :: leader().
 elect(ElectionId, Candidate, Options) ->
     _ = is_pid(Candidate) orelse error(badarg, [ElectionId, Candidate, Options]),
@@ -143,6 +144,7 @@ dismiss(Leader) ->
 %%
 %% It kills (i.e., `exit(Pid, kill)') the corresponding certificate process.
 %% As a result, the candidate process may exit if it have linked to the certificate process.
+-passage_trace([{tags, #{leader => "Leader"}}]).
 -spec dismiss(leader(), [dismiss_option()]) -> ok.
 dismiss(Leader, Options) ->
     _ = is_leader(Leader) orelse error(badarg, [Leader, Options]),
@@ -163,12 +165,14 @@ find_leader(ElectionId) ->
 %%
 %% If own node have already known the leader, this function will retrieve it from local ETS.
 %% Otherwise it will try fetching the election result from remote nodes.
+-passage_trace([{tags, #{election_id => "ElectionId"}}]).
 -spec find_leader(election_id(), [find_option()]) -> {ok, leader()} | error.
 find_leader(ElectionId, Options) ->
     _ = is_list(Options) orelse error(badarg, [ElectionId, Options]),
     evel_commission:find_leader(ElectionId, Options).
 
 %% @doc Returns a list of locally known leaders
+-passage_trace([]).
 -spec known_leaders() -> [{election_id(), leader()}].
 known_leaders() ->
     evel_commission:known_leaders().

@@ -44,7 +44,7 @@
           monitors = #{}         :: monitors()
         }).
 
--type start_arg() :: {evel:election_id(), evel:candidate(), [evel:elect_option()]}.
+-type start_arg() :: {passage:maybe_span(), evel:election_id(), evel:candidate(), [evel:elect_option()]}.
 -type agent() :: evel:certificate().
 -type monitors() :: #{evel_voter:voter() => reference()}.
 
@@ -52,31 +52,36 @@
 %% Exported Functions
 %%----------------------------------------------------------------------------------------------------------------------
 %% @doc Starts an agent process
+-passage_trace([]).
 -spec start_link(start_arg()) -> {ok, pid()} | {error, Reason::term()}.
 start_link(Arg) ->
-    gen_server:start_link(?MODULE, Arg, []).
+    Span = element(1, Arg),
+    gen_server_passage:start_link(?MODULE, Arg, [{span, Span}]).
 
 %% @doc Starts an election campaign for `Candidate'
+-passage_trace([{tags, #{election_id => "ElectionId", candidate => "Candidate"}}]).
 -spec start_campaign(evel:election_id(), evel:candidate(), [evel:elect_option()]) -> ok.
 start_campaign(ElectionId, Candidate, Options) ->
-    _ = evel_agent_sup:start_child({ElectionId, Candidate, Options}),
+    _ = evel_agent_sup:start_child({passage_pd:current_span(), ElectionId, Candidate, Options}),
     ok.
 
 %% @doc Removes the link between `Agent' and the corresponding candidate process
+-passage_trace([{tags, #{agent => "Agent"}}]).
 -spec unlink_candidate(agent()) -> ok.
 unlink_candidate(Agent) ->
-    gen_server:call(Agent, unlink_candidate).
+    gen_server_passage:call(Agent, unlink_candidate).
 
 %% @doc Gets the summary of `Agent'
+-passage_trace([{tags, #{agent => "Agent"}}]).
 -spec get_summary(agent()) -> {evel:election_id(), evel_voter:vote(), [evel_voter:voter()]}.
 get_summary(Agent) ->
-    gen_server:call(Agent, get_summary).
+    gen_server_passage:call(Agent, get_summary).
 
 %%----------------------------------------------------------------------------------------------------------------------
 %% 'gen_server' Callback Functions
 %%----------------------------------------------------------------------------------------------------------------------
 %% @private
-init({ElectionId, Candidate, Options}) ->
+init({_, ElectionId, Candidate, Options}) ->
     Priority = proplists:get_value(priority, Options, erlang:system_time(micro_seconds)),
     VoterCount = proplists:get_value(voter_count, Options, 5),
     _ = case proplists:get_value(link, Options, true) of
