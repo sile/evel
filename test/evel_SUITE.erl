@@ -8,6 +8,7 @@
 
 -export([all/0]).
 -export([init_per_suite/1]).
+-export([end_per_suite/1]).
 -export([end_per_testcase/1]).
 -export([elect_test/1]).
 -export([remote_elect_test/1]).
@@ -38,6 +39,9 @@ init_per_suite(Config) ->
     {ok, _} = net_kernel:start([evel_ct, shortnames]),
     ok = evel_debug:slave_start_n(?INITIAL_NODES),
     ?SLAVE_WAIT,
+    Config.
+
+end_per_suite(Config) ->
     Config.
 
 end_per_testcase(Config) ->
