@@ -121,7 +121,7 @@ handle_inquire_voters({ElectionId, From, VoterCount, DoMonitor}, State) ->
           fun hash_ring_node:get_key/1,
           hash_ring:collect_nodes(ElectionId, VoterCount, State#?STATE.people)),
     Listeners =
-        case DoMonitor of
+        case DoMonitor andalso not lists:member(From, State#?STATE.listeners) of
             false -> State#?STATE.listeners;
             true  ->
                 _ = monitor(process, From),
