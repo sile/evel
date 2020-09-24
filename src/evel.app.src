@@ -1,6 +1,6 @@
 {application,evel,
     [{description,"An Eventual Leader Election Library for Erlang"},
-     {vsn,"0.1.1"},
+     {vsn,"0.1.2"},
      {registered,
          [evel_sup,evel_people,evel_voter,evel_commission,evel_agent_sup]},
      {mod,{evel_app,[]}},
