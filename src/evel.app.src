@@ -9,6 +9,5 @@
          [{hash_ring_options,
               [{module,hash_ring_dynamic},{virtual_node_count,64}]}]},
      {modules,[]},
-     {maintainers,["Takeru Ohta"]},
      {licenses,["MIT"]},
      {links,[{"GitHub","https://github.com/sile/evel"}]}]}.
