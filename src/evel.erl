@@ -149,7 +149,12 @@ dismiss(Leader, Options) ->
     _ = is_list(Options) orelse error(badarg, [Leader, Options]),
     _ = case proplists:get_value(unlink, Options, false) of
             false -> ok;
-            true  -> catch evel_agent:unlink_candidate(get_certificate(Leader))
+            true ->
+                try
+                    evel_agent:unlink_candidate(get_certificate(Leader))
+                catch
+                    _:_ -> ok
+                end
         end,
     Async = proplists:get_value(async, Options, false),
     evel_commission:dismiss(Leader, Async).
