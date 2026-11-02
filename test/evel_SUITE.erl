@@ -36,7 +36,7 @@ all() ->
 
 init_per_suite(Config) ->
     {ok, _} = application:ensure_all_started(evel),
-    {ok, _} = net_kernel:start([evel_ct, shortnames]),
+    {ok, _} = net_kernel:start(evel_ct, #{name_domain => shortnames}),
     ok = evel_debug:slave_start_n(?INITIAL_NODES),
     ?SLAVE_WAIT,
     Config.
@@ -130,6 +130,7 @@ bare_slart_start_link(Start, End) ->
     {ok, Host} = inet:gethostname(),
     lists:foreach(
       fun (I) ->
-              {ok, _} = slave:start_link(Host, integer_to_list(I))
+              {ok, _Pid, _Node} =
+                  peer:start_link(#{name => integer_to_list(I), host => Host, longnames => false})
       end,
       lists:seq(Start, End)).
