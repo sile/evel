@@ -2,8 +2,7 @@ evel
 =====
 
 [![hex.pm version](https://img.shields.io/hexpm/v/evel.svg)](https://hex.pm/packages/evel)
-[![Build Status](https://travis-ci.org/sile/evel.svg?branch=master)](https://travis-ci.org/sile/evel)
-[![Code Coverage](https://codecov.io/gh/sile/evel/branch/master/graph/badge.svg)](https://codecov.io/gh/sile/evel/branch/master)
+[![CI](https://github.com/sile/evel/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/sile/evel/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 `evel` is a distributed leader election library which has eventual consistency.
