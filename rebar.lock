@@ -1,6 +1,8 @@
-{"1.1.0",
+{"1.2.0",
 [{<<"hash_ring">>,{pkg,<<"hash_ring">>,<<"0.4.0">>},0}]}.
 [
 {pkg_hash,[
- {<<"hash_ring">>, <<"5B6FC75DA078865DD0E0007E4145A3E27FF07963E090F822FF99349A577296ED">>}]}
+ {<<"hash_ring">>, <<"5B6FC75DA078865DD0E0007E4145A3E27FF07963E090F822FF99349A577296ED">>}]},
+{pkg_hash_ext,[
+ {<<"hash_ring">>, <<"97F7B4252E660AE3C66FD163277267D3445CFEA097342027FE6CC3512FDAFD16">>}]}
 ].

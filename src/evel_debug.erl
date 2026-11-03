@@ -53,12 +53,21 @@ slave_start_link_n(Start, End) ->
 %%----------------------------------------------------------------------------------------------------------------------
 %% Internal Functions
 %%----------------------------------------------------------------------------------------------------------------------
--spec slave_start_n_impl(non_neg_integer(), non_neg_integer(), atom()) -> ok.
+-spec slave_start_n_impl(non_neg_integer(), non_neg_integer(), start | start_link) -> ok.
 slave_start_n_impl(Start, End, StartFun) ->
     {ok, Host} = inet:gethostname(),
+    Args = ["-kernel", "prevent_overlapping_partitions", "false", "-pa" | code:get_path()],
     ok = lists:foreach(
            fun (I) ->
-                   {ok, _} = slave:StartFun(Host, integer_to_list(I))
+                   Options = #{name => integer_to_list(I),
+                               host => Host,
+                               longnames => false,
+                               args => Args},
+                   {ok, _Pid, _Node} =
+                       case StartFun of
+                           start -> peer:start(Options);
+                           start_link -> peer:start_link(Options)
+                       end
            end,
            lists:seq(Start, End)),
     _ = rpc:eval_everywhere(code, add_pathsa, [code:get_path()]),
