@@ -110,7 +110,7 @@ nodes_leave_test(_Config) ->
     ok = lists:foreach(fun (Result) -> {ok, Leader} = Result end, Results1).
 
 non_evel_nodes_test(_Config) ->
-    ok = bare_slart_start_link(?INITIAL_NODES + 1, ?INITIAL_NODES + 5),
+    ok = bare_slave_start_link(?INITIAL_NODES + 1, ?INITIAL_NODES + 5),
     ?SLAVE_WAIT,
     ?INITIAL_NODES = length(nodes()) - 5,
     Self = self(),
@@ -126,7 +126,7 @@ summary_test(_Config) ->
 %%----------------------------------------------------------------------------------------------------------------------
 %% Internal Functions
 %%----------------------------------------------------------------------------------------------------------------------
-bare_slart_start_link(Start, End) ->
+bare_slave_start_link(Start, End) ->
     {ok, Host} = inet:gethostname(),
     lists:foreach(
       fun (I) ->

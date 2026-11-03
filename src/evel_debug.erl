@@ -56,6 +56,9 @@ slave_start_link_n(Start, End) ->
 -spec slave_start_n_impl(non_neg_integer(), non_neg_integer(), start | start_link) -> ok.
 slave_start_n_impl(Start, End, StartFun) ->
     {ok, Host} = inet:gethostname(),
+    %% `prevent_overlapping_partitions' defaults to `true' since OTP 25.
+    %% It is disabled explicitly so that the helper functions below can start
+    %% nodes that do not automatically reconnect to each other.
     Args = ["-kernel", "prevent_overlapping_partitions", "false", "-pa" | code:get_path()],
     ok = lists:foreach(
            fun (I) ->
@@ -70,6 +73,8 @@ slave_start_n_impl(Start, End, StartFun) ->
                        end
            end,
            lists:seq(Start, End)),
+    %% The newly started nodes already received the code path via the `-pa' argument above.
+    %% This call covers the nodes that were running before.
     _ = rpc:eval_everywhere(code, add_pathsa, [code:get_path()]),
     _ = rpc:eval_everywhere(application, ensure_all_started, [evel]),
     ok.
